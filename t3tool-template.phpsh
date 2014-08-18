@@ -1,0 +1,86 @@
+<?php
+/**
+ * t3tool-sqlq.phpsh
+ *
+ * Handles the command "t3tool sqlq <sql>".
+ *
+ * @package t3tool
+ * @author Lars Køie
+ *
+ */
+
+/**
+ * @param $args
+ */
+function t3tool_template_handlecmd($args) {
+
+  $cmd = array_shift($args);
+  $id = trim(strtolower($args[0]));
+  $where = ' and not sys_template.deleted';
+  if ($id) {
+    $where .= " and (sys_template.title like '$id' or sys_template.uid='$id') ";
+  }
+
+  switch ($cmd) {
+
+    #
+    # Template list
+    #
+    case 'list' :
+    case 'find' :
+      $tpls = sql_get_rows("
+      select sys_template.uid, sys_template.title, sys_template.hidden, pages.uid as pid, pages.title as pageTitle, 'sys_template' as _table
+      from sys_template
+      left join pages on pages.uid=sys_template.pid
+      where 1 " . $where . " order by uid asc");
+      if ($cmd == 'find') {
+        showRecordsInPageTree($tpls);
+      } else {
+        sendAsFlatTable($tpls);
+      }
+      break;
+
+    #
+    # Search for template
+    #
+    case 'show' :
+      if (!trim($id)) {
+        die("Usage : t3tool template show <title or uid>. Case insensitive.\n");
+      }
+      $tpl = getSingleRecordByString("sys_template", $pid, array('title'));
+      sendRecordAsTable($tpl);
+      break;
+
+    #
+    # Set a TS value on a pid.
+    # TODO : find some way to move this to t3tool-ts.phpsh
+    #
+    case 'set' :
+      $key = $args[1];
+      $value = $args[2];
+      $pid = $args[0];
+      $page = getSingleRecordByString('pages', $pid);
+
+      if (!trim($value)) {
+        die("Usage : t3tool template set <pid> <key> <value>\n");
+      }
+      echo "Setting '$key' to '$value' on page '" . $page['title'] . "'... ";
+
+      sql_query("update sys_template set config=concat(config, '\n$key = $value') where pid=$pid and not hidden order by sorting limit 1");
+      if (! sql_affected_rows())
+          die("No templates on page. Nothing done.\n");
+      echo "done.\n";
+      break;
+
+    default :
+      die("Usage :
+  t3tool template list
+    List all templates.
+  t3tool template show <uid or title>
+    Show single template with all fields.
+
+");
+
+
+  }
+}

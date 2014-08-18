@@ -1,0 +1,33 @@
+<?php
+/**
+ * t3tool-sqlq.phpsh
+ *
+ * Handles the command "t3tool sqlq <sql>".
+ *
+ * @package t3tool
+ * @author Lars Køie
+ *
+ */
+
+/**
+ * @param $args array Arguments.
+ *
+ */
+function t3tool_sqlq_handlecmd($args) {
+  $sql = $args[0];
+
+  if (!trim($sql)) {
+    die("Usage:
+      t3tool sqlq <sql query>
+        Will run an sql query on TYPO3 database and output the result if any.
+      ");
+  }
+
+  $result = sql_get_rows($sql);
+  if ($result == FALSE) {
+    die("Error\n");
+  }
+
+  sendAsFlatTable($result);
+
+}

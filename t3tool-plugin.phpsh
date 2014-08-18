@@ -1,0 +1,69 @@
+<?php
+/**
+ * t3tool-sqlq.phpsh
+ *
+ * Handles the commands "t3tool ext ...".
+ *
+ * @package t3tool
+ * @author Lars Køie
+ *
+ */
+
+/**
+ * @param $args
+ */
+function t3tool_plugin_handlecmd($args) {
+
+  $cmd = array_shift($args);
+  $ext = trim(strtolower($args[0]));
+  $stripped_ext = str_replace('_', '', $ext);
+
+  switch ($cmd) {
+
+#
+# Show plugin instances from extension.
+#
+    case 'list' :
+    case 'find' :
+      $sql = "select uid, pid, hidden, header as title, list_type, 'tt_content' as _table
+        from tt_content
+        where CType='list' " . getDeleteClause('tt_content');
+
+      if ($ext) {
+        $sql .= " and list_type like '$ext%'";
+      }
+
+      if ($cmd == 'stat') {
+        $sql .= ' group by concat(pid, list_type)';
+      }
+
+      $plugins = sql_get_rows($sql);
+
+      if ($cmd == 'list') {
+        sendAsFlatTable($plugins);
+      }
+      if ($cmd == 'find') {
+        showRecordsInPageTree($plugins);
+      }
+
+
+      break;
+
+    case 'stat' :
+      $sql = "select list_type, count(*), hidden, header as title
+        from tt_content
+        where CType='list' " . getDeleteClause('tt_content');
+
+      if ($ext) {
+        $sql .= " and list_type like '$ext%'";
+      }
+
+      $sql .= ' group by concat(list_type, hidden)';
+
+      $plugins = sql_get_rows($sql);
+
+      sendAsFlatTable($plugins);
+      break;
+
+  }
+}

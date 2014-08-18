@@ -1,0 +1,219 @@
+<?php
+  /**
+   * t3tool-sqlq.phpsh
+   *
+   * Handles the commands "t3tool ext ...".
+   *
+   * @package t3tool
+   * @author Lars Køie
+   *
+   */
+
+  /**
+   * @param $args
+   */
+  function t3tool_ext_handlecmd($args) {
+
+    $cmd = array_shift($args);
+    $ext = trim(strtolower($args[0]));
+    $stripped_ext = str_replace('_', '', $ext);
+
+    if ($GLOBALS['version_4']) {
+      $exts = explode(',', $GLOBALS['TYPO3_CONF_VARS']['EXT']['extList']);
+    }
+    if ($GLOBALS['version_6']) {
+      $exts = $GLOBALS['TYPO3_CONF_VARS']['EXT']['extListArray'];
+    }
+
+    $EM_CONF = array();
+    // these are the installed extensinos
+    foreach ($exts as $_EXTKEY) {
+      if (is_file("typo3conf/ext/$_EXTKEY/ext_emconf.php")) {
+        include_once("typo3conf/ext/$_EXTKEY/ext_emconf.php");
+        $EM_CONF[$_EXTKEY]['added by t3tool']['path'] = 'typo3conf/ext/';
+        $EM_CONF[$_EXTKEY]['added by t3tool']['type'] = 'Local';
+      }
+      if (is_file("typo3/ext/$_EXTKEY/ext_emconf.php")) {
+        include_once("typo3/ext/$_EXTKEY/ext_emconf.php");
+        $EM_CONF[$_EXTKEY]['added by t3tool']['path'] = 'typo3/ext/';
+        $EM_CONF[$_EXTKEY]['added by t3tool']['type'] = 'Global';
+      }
+      if (is_file("typo3/sysext/$_EXTKEY/ext_emconf.php")) {
+        include_once("typo3/sysext/$_EXTKEY/ext_emconf.php");
+        $EM_CONF[$_EXTKEY]['added by t3tool']['path'] = 'typo3/sysext/';
+        $EM_CONF[$_EXTKEY]['added by t3tool']['type'] = 'System';
+        $EM_CONF[$_EXTKEY]['added by t3tool']['installed'] = TRUE;
+      }
+    }
+
+    // now add the extensions that are not installed
+    foreach (array('typo3conf/ext/', 'typo3/ext/', 'typo3/sysext/') as $path) {
+      $dh = opendir($path);
+      while ($_EXTKEY= readdir($dh)) {
+        if (substr($_EXTKEY, 0, 1) == '.')
+            continue;
+        if (!is_dir($path . $_EXTKEY))
+          continue;
+        if (isset($EM_CONF[$_EXTKEY]))
+          continue;
+
+        include_once($path . "$_EXTKEY/ext_emconf.php");
+        $EM_CONF[$_EXTKEY]['added by t3tool']['path'] = $path;
+        $EM_CONF[$_EXTKEY]['added by t3tool']['installed'] = FALSE;
+
+      }
+    }
+
+    ksort($EM_CONF);
+
+    switch ($cmd) {
+
+      case 'list' :
+        foreach ($EM_CONF as $extkey => $config) {
+          if (!$ext || preg_match("/$ext/", $extkey) || preg_match("/$ext/", $config['title'])) {
+            $extlist[] = array(
+              'key' => $extkey,
+              'title' => $config['title'],
+              'version' => $config['version'],
+              'type' => $config['added by t3tool']['type'],
+            );
+          }
+        }
+        echo "Installed extensions:\n";
+        sendAsFlatTable($extlist);
+        break;
+
+      #
+      # Show content of ext_emconf.php file.
+      #
+      case 'show' :
+        if (!trim($ext)) {
+          die("Usage : t3tool ext show <extkey>.\n");
+        }
+        print_R($EM_CONF[$ext]);
+
+        break;
+
+      case 'disable':
+        unset($EM_CONF[$ext]);
+        if ($GLOBALS['version_4']) {
+          print '$GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extList"] = ' . implode(',', array_keys($EM_CONF));
+        }
+        if ($GLOBALS['version_6']) {
+          print '$GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extListArray"] = ' . var_export(array_keys($EM_CONF), 1) . ';';
+        }
+        break;
+
+      case 'config' :
+        if (!trim($ext)) {
+          die("Usage : t3tool ext config <extkey>.\n");
+        }
+        print_R(unserialize($TYPO3_CONF_VARS['EXT']['extConf'][$ext]));
+        break;
+
+      case 'dependencies' :
+        foreach ($EM_CONF as $_EXTKEY => $config) {
+          $depender_version = $EM_CONF[$_EXTKEY]['version'];
+
+          // post 6-0
+          if (isset($EM_CONF[$_EXTKEY]['constraints']['depends'])) {
+            $dependencies = $EM_CONF[$_EXTKEY]['constraints']['depends'];
+            foreach ($dependencies as $dependee => $version) {
+              $by_depender[$_EXTKEY . ' ' . $depender_version][$dependee] = $version;
+              $by_dependee[$dependee][$version][$_EXTKEY] = TRUE;
+            }
+          } else {
+            // pre-6.0
+            if (isset($EM_CONF[$_EXTKEY]['dependencies'])) {
+              $dependencies = $EM_CONF[$_EXTKEY]['dependencies'];
+              foreach (explode(',', $dependencies) as $dependee) {
+                $by_depender[$_EXTKEY . ' ' . $depender_version][$dependee] = TRUE;
+                $by_dependee[$dependee][$version][$_EXTKEY] = TRUE;
+              }
+            }
+          }
+        }
+
+        ksort($by_dependee);
+        echo "Dependencies by depender:\n";
+        foreach ($by_depender as $depender => $dependees) {
+          echo "  $depender :\n";
+          foreach ($dependees as $dependee => $version) {
+            echo "    $dependee $version\n";
+          }
+        }
+
+        echo "Dependencies by dependee:\n";
+        foreach ($by_dependee as $dependee => $versions) {
+          ksort($versions);
+          echo "  $dependee :\n";
+          foreach ($versions as $version => $dependers) {
+            if (!$version)
+              $version = 'any';
+            echo "    $version :\n";
+            foreach ($dependers as $depender => $version) {
+              echo "      $depender\n";
+            }
+
+          }
+        }
+
+        break;
+
+      case 'conflicts' :
+        foreach ($EM_CONF as $_EXTKEY => $config) {
+          $depender_version = $EM_CONF[$_EXTKEY]['version'];
+
+          // post 6-0
+          if (isset($EM_CONF[$_EXTKEY]['constraints']['conflicts'])) {
+            foreach ($EM_CONF[$_EXTKEY]['constraints']['conflicts'] as $dependee => $version) {
+              $by_depender[$_EXTKEY . ' ' . $depender_version][$dependee] = $version;
+              $by_dependee[$dependee][$version][$_EXTKEY] = TRUE;
+            }
+          } else {
+            // pre-6.0
+            if (isset($EM_CONF[$_EXTKEY]['conflicts'])) {
+              foreach (explode(',', $EM_CONF[$_EXTKEY]['conflicts']) as $dependee) {
+                $by_depender[$_EXTKEY . ' ' . $depender_version][$dependee] = TRUE;
+                $by_dependee[$dependee][$version][$_EXTKEY] = TRUE;
+              }
+            }
+          }
+        }
+
+        ksort($by_dependee);
+        echo "Conflicts by declarer :\n";
+        foreach ($by_depender as $depender => $dependees) {
+          echo "  $depender :\n";
+          foreach ($dependees as $dependee => $version) {
+            echo "    $dependee $version\n";
+          }
+        }
+
+        echo "Conflicts by conflictee :\n";
+        foreach ($by_dependee as $dependee => $versions) {
+          ksort($versions);
+          echo "  $dependee :\n";
+          foreach ($versions as $version => $dependers) {
+            if (!$version)
+                $version = 'any';
+            echo "    $version :\n";
+            foreach ($dependers as $depender => $version) {
+              echo "      $depender\n";
+            }
+
+          }
+        }
+
+        break;
+
+      default :
+        die('Usage :
+  t3tool ext list
+  t3tool ext config <extkey>
+  t3tool ext dependencies
+
+');
+    }
+  }
+	

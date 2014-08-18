@@ -1,0 +1,47 @@
+<?php
+
+#  
+# Files (sys_file)
+#   
+
+$cmd = array_shift($args);
+$id = trim(strtolower($args[0]));
+$where = '';
+if ($id)
+  $where = " and (name like '%$id%' or uid='$id') ";
+
+switch ($cmd) {
+
+  #  
+  # File list
+  #   
+  case 'list' :
+    $records = sql_get_rows ("select uid, pid, name from sys_file order by uid asc");
+    sendAsFlatTable($records);
+    break;	
+
+  #  
+  # Search for file
+  #   
+  case 'show' :
+    if (! trim($id)) {
+    	die("Usage : t3tool file show <title or uid>. Case insensitive.\n");  		  
+    }
+    $record = sql_get_row ("select * from sys_file where 1 " . $where);
+    if (! $record)
+    	die("File not found.\n");
+    	
+    sendRecordAsTable($record);
+    break;	
+
+
+  default :
+	  die("Usage : 
+  t3tool file list
+    List all files.
+  t3tool file show <name or uid>
+    Show details of single file.
+    
+  	   ");
+
+	}

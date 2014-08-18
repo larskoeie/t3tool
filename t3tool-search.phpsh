@@ -1,0 +1,86 @@
+<?php
+/**
+ * t3tool-search.phpsh
+ *
+ * Handles the command "t3tool search ...".
+ *
+ * @package t3tool
+ * @author Lars Køie
+ *
+ */
+
+/**
+ * @param $args
+ *
+ */
+function t3tool_search_handlecmd($args) {
+
+  $table = $args[0];
+  $q = $args[1];
+
+  if (isset($label[$table])) {
+    $lab = $label[$table];
+  } else {
+    $lab = 'uid';
+  }
+
+  if (!$table) {
+    die("Usage:
+  t3tool search <table> <string>
+    Will search table in usual columns.
+    \n");
+  }
+
+
+  $search_fields = array(
+    'pages' => array(
+      'title' => 1,
+    ),
+    'sys_domain' => array(
+      'domainName' => 1,
+    ),
+    'sys_template' => array(
+      'title' => 1,
+      'config' => 1,
+    ),
+    'tt_content' => array(
+      'header' => 1,
+      'list_type' => 1,
+      'CType' => 1,
+      'bodytext' => 1,
+    ),
+    'tt_news' => array(
+      'title' => 1,
+    )
+  );
+
+  $or = "(t.uid='$q'";
+  if (isset($search_fields[$table])) {
+    foreach ($search_fields[$table] as $field => $conf) {
+      $or .= ' or t.' . $field . ' like "%' . $q . '%"';
+    }
+  }
+  $or .= ')';
+  $where = ' and ' . $or;
+
+  $sql = "
+    select t.$lab as title, t.uid, t.pid, t.hidden,
+    '$table' as _table
+    from $table as t 
+    left join pages as p on (p.uid=t.pid) 
+    where 1 " . $where . "  
+    group by t.uid
+    ";
+
+  $res = sql_query($sql);
+
+  $rows = array();
+  while ($row = sql_fetch_array($res)) {
+    $row['body'] = cropAndHilite($row['body'], $query);
+    $row['_table'] = $table;
+    $rows[] = $row;
+
+  }
+  showRecordsInPageTree($rows);
+
+}
