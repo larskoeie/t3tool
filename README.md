@@ -4,6 +4,11 @@ It allows you to list, show details of and modify backend users, domain records 
 
 Full command list :
 
+  
+```
+#!php
+
+
   t3tool alldomains enable [except <domain or uid>]
     Enable all domains.
   t3tool alldomains disable [except <domain or uid>]
@@ -63,3 +68,5 @@ Full command list :
     Set users password (passwrord will be prompted).
   t3tool user create <username, email or uid>
     Create admin user (password will be prompted).
+
+```
