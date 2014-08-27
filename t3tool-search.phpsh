@@ -1,69 +1,70 @@
 <?php
-/**
- * t3tool-search.phpsh
- *
- * Handles the command "t3tool search ...".
- *
- * @package t3tool
- * @author Lars Køie
- *
- */
+  /**
+   * t3tool-search.phpsh
+   *
+   * Handles the command "t3tool search ...".
+   *
+   * @package t3tool
+   * @author Lars Køie
+   *
+   */
 
-/**
- * @param $args
- *
- */
-function t3tool_search_handlecmd($args) {
+  /**
+   * @param $args
+   *
+   */
+  function t3tool_search_handlecmd($args) {
+    global $label;
 
-  $table = $args[0];
-  $q = $args[1];
+    $table = $args[0];
+    $q = $args[1];
 
-  if (isset($label[$table])) {
-    $lab = $label[$table];
-  } else {
-    $lab = 'uid';
-  }
+    if (isset($label[$table])) {
+      $lab = $label[$table];
+    } else {
+      $lab = 'uid';
+    }
 
-  if (!$table) {
-    die("Usage:
+    if (!$table) {
+      die("Usage:
   t3tool search <table> <string>
     Will search table in usual columns.
     \n");
-  }
-
-
-  $search_fields = array(
-    'pages' => array(
-      'title' => 1,
-    ),
-    'sys_domain' => array(
-      'domainName' => 1,
-    ),
-    'sys_template' => array(
-      'title' => 1,
-      'config' => 1,
-    ),
-    'tt_content' => array(
-      'header' => 1,
-      'list_type' => 1,
-      'CType' => 1,
-      'bodytext' => 1,
-    ),
-    'tt_news' => array(
-      'title' => 1,
-    )
-  );
-
-  $or = "(t.uid='$q'";
-  if (isset($search_fields[$table])) {
-    foreach ($search_fields[$table] as $field => $conf) {
-      $or .= ' or t.' . $field . ' like "%' . $q . '%"';
     }
-  }
-  $or .= ')';
-  $where = ' and ' . $or;
 
-  $sql = "
+
+    $search_fields = array(
+      'pages' => array(
+        'title' => 1,
+      ),
+      'sys_domain' => array(
+        'domainName' => 1,
+      ),
+      'sys_template' => array(
+        'title' => 1,
+        'config' => 1,
+      ),
+      'tt_content' => array(
+        'header' => 1,
+        'list_type' => 1,
+        'CType' => 1,
+        'bodytext' => 1,
+      ),
+      'tt_news' => array(
+        'title' => 1,
+      )
+    );
+
+    $or = "(t.uid='$q'";
+    if (isset($search_fields[$table])) {
+      foreach ($search_fields[$table] as $field => $conf) {
+        $or .= ' or t.' . $field . ' like "%' . $q . '%"';
+      }
+    }
+    $or .= ')';
+    $where = ' and ' . $or;
+
+    $sql = "
     select t.$lab as title, t.uid, t.pid, t.hidden,
     '$table' as _table
     from $table as t 
@@ -72,15 +73,15 @@ function t3tool_search_handlecmd($args) {
     group by t.uid
     ";
 
-  $res = sql_query($sql);
+    $res = sql_query($sql);
 
-  $rows = array();
-  while ($row = sql_fetch_array($res)) {
-    $row['body'] = cropAndHilite($row['body'], $query);
-    $row['_table'] = $table;
-    $rows[] = $row;
+    $rows = array();
+    while ($row = sql_fetch_array($res)) {
+      $row['body'] = cropAndHilite($row['body'], $query);
+      $row['_table'] = $table;
+      $rows[] = $row;
+
+    }
+    showRecordsInPageTree($rows);
 
   }
-  showRecordsInPageTree($rows);
-
-}

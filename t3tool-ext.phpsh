@@ -49,18 +49,22 @@
     // now add the extensions that are not installed
     foreach (array('typo3conf/ext/', 'typo3/ext/', 'typo3/sysext/') as $path) {
       $dh = opendir($path);
-      while ($_EXTKEY= readdir($dh)) {
-        if (substr($_EXTKEY, 0, 1) == '.')
-            continue;
-        if (!is_dir($path . $_EXTKEY))
+      while ($_EXTKEY = readdir($dh)) {
+        if (substr($_EXTKEY, 0, 1) == '.') {
           continue;
-        if (isset($EM_CONF[$_EXTKEY]))
+        }
+        if (!is_dir($path . $_EXTKEY)) {
           continue;
+        }
+        if (isset($EM_CONF[$_EXTKEY])) {
+          continue;
+        }
 
-        include_once($path . "$_EXTKEY/ext_emconf.php");
-        $EM_CONF[$_EXTKEY]['added by t3tool']['path'] = $path;
-        $EM_CONF[$_EXTKEY]['added by t3tool']['installed'] = FALSE;
-
+        if (is_file($path . "$_EXTKEY/ext_emconf.php")) {
+          include_once($path . "$_EXTKEY/ext_emconf.php");
+          $EM_CONF[$_EXTKEY]['added by t3tool']['path'] = $path;
+          $EM_CONF[$_EXTKEY]['added by t3tool']['installed'] = FALSE;
+        }
       }
     }
 
@@ -143,13 +147,15 @@
           }
         }
 
+        echo "\n";
         echo "Dependencies by dependee:\n";
         foreach ($by_dependee as $dependee => $versions) {
           ksort($versions);
           echo "  $dependee :\n";
           foreach ($versions as $version => $dependers) {
-            if (!$version)
+            if (!$version) {
               $version = 'any';
+            }
             echo "    $version :\n";
             foreach ($dependers as $depender => $version) {
               echo "      $depender\n";
@@ -195,8 +201,9 @@
           ksort($versions);
           echo "  $dependee :\n";
           foreach ($versions as $version => $dependers) {
-            if (!$version)
-                $version = 'any';
+            if (!$version) {
+              $version = 'any';
+            }
             echo "    $version :\n";
             foreach ($dependers as $depender => $version) {
               echo "      $depender\n";
@@ -207,13 +214,93 @@
 
         break;
 
+
+      case 'report' :
+
+        $projects = array();
+
+        foreach ($EM_CONF as $extKey => $info) {
+
+          $secureVersion = getSecureVersion($extKey, $info['version']);
+          $latestVersion = getLatestVersion($extKey, $info['version']);
+
+          $projectUpdate = $latestVersion != $info['version'];
+          $projectSecurity = $secureVersion != $info['version'];
+
+          $project = array(
+            'extension' => $extKey,
+            'installed' => $info['version'],
+            'latest' => $latestVersion,
+            'status' => '',
+          );
+
+          if ($projectUpdate) {
+            $project['status'] = 'Update';
+          }
+          if ($projectSecurity) {
+            $project['status'] = 'SECURITY update';
+          }
+
+          $siteUpdate |= $projectUpdate;
+          $siteSecurity |= $projectSecurity;
+
+          if ($projectUpdate) {
+            $projects[] = $project;
+          }
+        }
+
+        sendAsFlatTable($projects);
+
+
+        break;
+
       default :
         die('Usage :
   t3tool ext list
+  t3tool show <ext>
   t3tool ext config <extkey>
   t3tool ext dependencies
 
 ');
     }
   }
-	
+
+
+  function getSecureVersion($extKey, $curVersion) {
+    global $TYPO3_DB;
+    $intVer = convertVersionNumberToInteger($curVersion);
+    $res = sql_query('SELECT * FROM cache_extensions WHERE extkey = "' . $extKey . '" AND reviewstate = 0 AND intversion > ' . $intVer . ' AND (SELECT intversion FROM cache_extensions WHERE extkey = "' . $extKey . '" AND reviewstate = -1 AND intversion = ' . $intVer . ') ORDER BY intversion LIMIT 1');
+    if ($row = sql_fetch_assoc($res)) {
+      return $row['version'];
+    }
+
+    return $curVersion;
+  }
+
+  function getLatestVersion($extKey, $curVersion) {
+    global $TYPO3_DB;
+    $intVer = convertVersionNumberToInteger($curVersion);
+    $res = sql_query('SELECT * FROM cache_extensions WHERE extkey = "' . $extKey . '" AND reviewstate = 0 AND intversion > ' . $intVer . ' AND (SELECT intversion FROM cache_extensions WHERE extkey = "' . $extKey . '" AND reviewstate = -1 AND intversion = ' . $intVer . ') ORDER BY intversion LIMIT 1');
+    if ($row = sql_fetch_assoc($res)) {
+      return $row['version'];
+    }
+
+    return $curVersion;
+  }
+
+  /**
+   * \TYPO3\CMS\Core\Utility\VersionNumberUtility::convertVersionNumberToInteger
+   *
+   * @param $versionNumber
+   *
+   * @return int
+   */
+  function convertVersionNumberToInteger($versionNumber) {
+    $versionParts = explode('.', $versionNumber);
+
+    return intval(((int)$versionParts[0] . str_pad((int)$versionParts[1], 3, '0', STR_PAD_LEFT)) . str_pad((int)$versionParts[2], 3, '0', STR_PAD_LEFT));
+        }
+
+
+
+

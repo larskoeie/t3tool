@@ -1,62 +1,68 @@
 <?php
-/**
- * t3tool-allusers.phpsh
- *
- * Handles the commands "t3tool allusers ...".
- *
- * @package t3tool
- * @author Lars Køie
- *
- */
+  /**
+   * t3tool-allusers.phpsh
+   *
+   * Handles the commands "t3tool allusers ...".
+   *
+   * @package t3tool
+   * @author Lars Køie
+   *
+   */
 
-function t3tool_allusers_handlecmd ($args) {
+  function t3tool_allusers_handlecmd($args) {
 
-  $cmd = array_shift($args);
-  if ($args[0] == 'except') {
-  	$username = trim(strtolower($args[1]));
-    $where = " and (username not like '$username' and email not like '$username' and uid != '$username')";
-  }
-  
-  switch ($cmd) {
-  
-    #  
-    # Enable all users
-    #   
-  	case 'enable' :
-      sql_query ("update be_users set disable=0 where 1 " . $where);
-      if (! sql_affected_rows())
-      	die("No users found.\n");
-      	
-      break;	
-  
-    #
-    # Disable all users
-    #
-  	case 'disable' :
-      sql_query ("update be_users set disable=1 where 1 " . $where);
-      if (! sql_affected_rows())
-      	die("No users found.\n");
-      break;	
-  
-    #
-    # Delete all users
-    #
-  	case 'delete' :
-      // not implemented    	
-      break;	
-  
-    #
-    # Remove email from all users.
-    #
-  	case 'disableemail' :
-    case 'removeemail' :
-      sql_query ("update be_users set email='' where 1 " . $where);
-      if (! sql_affected_rows())
-      	die("No users found.\n");
-      break;	
-  
-    default :
-      die ("Usage :
+    $cmd = array_shift($args);
+    if ($args[0] == 'except') {
+      $username = trim(strtolower($args[1]));
+      $where = " and (username not like '$username' and email not like '$username' and uid != '$username')";
+    }
+
+    switch ($cmd) {
+
+      //
+      // Enable all users
+      //
+      case 'enable' :
+        $users = getRecordsByString('be_users');
+
+        echo "Enabling " . sizeof($users) . " users... ";
+        sql_query("update be_users set disable=0 where 1 " . $where);
+        echo "done.\n";
+
+        break;
+
+      //
+      // Disable all users
+      //
+      case 'disable' :
+        $users = getRecordsByString('be_users');
+
+        echo "Disabling " . sizeof($users) . " users... ";
+        sql_query("update be_users set disable=1 where username not like '\_%' " . $where);
+        echo "done.\n";
+
+        break;
+
+      //
+      // Delete all users
+      //
+      case 'delete' :
+        // not implemented
+        break;
+
+      //
+      // Remove email from all users.
+      //
+      case 'disableemail' :
+      case 'removeemail' :
+        $users = getRecordsByString('be_users');
+        echo "Removing email from " . sizeof($users) . " users... ";
+        sql_query("update be_users set email='' where 1 " . $where);
+        echo "done.\n";
+        break;
+
+      default :
+        die ("Usage :
     t3tool allusers enable [except <username, email or uid>]
       Enable all users.
     t3tool allusers disable [except <username, email or uid>]
@@ -67,5 +73,5 @@ function t3tool_allusers_handlecmd ($args) {
     All username and email matches are case insensitive.		  
   ");
     }
-    
-}
+
+  }

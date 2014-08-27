@@ -1,0 +1,58 @@
+
+_t3tool() {
+    local cur prev
+
+    COMPREPLY=()
+
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+    if [ $COMP_CWORD -eq 1 ]
+        then
+    COMPREPLY=( $( compgen -W 'alldomains allusers domain ext log page plugin search sqlq user' -- $cur ) )
+    fi
+
+    if [ $COMP_CWORD -eq 2 ]
+        then
+case "$prev" in
+    "alldomains")
+    COMPREPLY=( $( compgen -W 'enable disable' -- $cur ) )
+    ;;
+
+    "allusers")
+    COMPREPLY=( $( compgen -W 'disable enable removeemail' -- $cur ) )
+    ;;
+
+    "domain")
+    COMPREPLY=( $( compgen -W 'add check delete disable dns dnsandcheck enable movetotop show' -- $cur ) )
+    ;;
+
+    "ext")
+    COMPREPLY=( $( compgen -W 'config dependencies list show' -- $cur ) )
+    ;;
+
+    "plugin")
+    COMPREPLY=( $( compgen -W 'list' -- $cur ) )
+    ;;
+
+    "search")
+    COMPREPLY=( $( compgen -W 'pages tt_content' -- $cur ) )
+    ;;
+
+    "user")
+    COMPREPLY=( $( compgen -W 'addgroup clradmin create delete disable enable groups list members password rmgroup setgroup show showgroup' -- $cur ) )
+    ;;
+
+    "template")
+    COMPREPLY=( $( compgen -W 'find list set show' -- $cur ) )
+    ;;
+
+    esac
+    fi
+
+    return 0
+}
+
+complete -F _t3tool t3tool
+
+

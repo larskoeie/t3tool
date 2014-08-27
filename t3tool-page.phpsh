@@ -1,104 +1,130 @@
 <?php
-/**
- * t3tool-sqlq.phpsh
- *
- * Handles the command "t3tool sqlq <sql>".
- *
- * @package t3tool
- * @author Lars Køie
- *
- */
+  /**
+   * t3tool-page.phpsh
+   *
+   * Handles the commands "t3tool page ...".
+   *
+   * @package t3tool
+   * @author Lars Køie
+   *
+   */
 
-/**
- * @param $args
- *
- */
-function t3tool_page_handlecmd($args) {
+  /**
+   * @param $args
+   *
+   */
+  function t3tool_page_handlecmd($args) {
 
-  $cmd = array_shift($args);
-  $title = trim(strtolower($args[0]));
-  $where = " and (title like '$title' or uid='$title')";
+    $cmd = array_shift($args);
+    $title = trim($args[0]);
+    $where = " and (title like '$title' or uid='$title')";
 
-  switch ($cmd) {
+    switch ($cmd) {
 
-    #
-    # Show a single page.
-    #
-    case 'show' :
-      if (!trim($title)) {
-        die("Usage : t3tool page show <title or uid>. Case insensitive.");
-      }
-      $page = getSingleRecordByString('pages', $title, array('title'));
-
-      sendRecordAsTable($page);
-      break;
-
-    #
-    # Add a page on pid arg. New page is hidden.
-    #
-    case 'add' :
-      $pid = $args[1];
-      if (!trim($pid)) {
-        die ("Usage : t3tool page add <title> <parent's title or pid>");
-      }
-      if (!is_int($pid)) {
-        $pages = sql_get_rows("select uid from pages where title like '%ppid%'");
-        if (sizeof($pages) == 1) {
-          $pid = $pages[0]['pid'];
+      //
+      // Show a single page.
+      //
+      case 'show' :
+        if (!trim($title)) {
+          die("Usage : t3tool page show <title or uid>. Case insensitive.\n");
         }
-      }
-      sql_query("insert into pages (hidden, title, pid) values (1, '$title', '$pid')");
-      break;
+        $page = getSingleRecordByString('pages', $title, array('title'));
+        sendRecordAsTable($page);
+        break;
 
-    #
-    # Delete a single page.
-    #
-    case 'delete' :
-      if (!trim($title)) {
-        die("Usage : t3tool page delete <title or uid>. Case insensitive.");
-      }
-      sql_query("update pages set deleted=1 where " . $where . " limit 1");
-      if (!sql_affected_rows()) {
-        die("Page not found.");
-      }
+      //
+      // Add a page on pid arg. New page is hidden.
+      //
+      case 'add' :
+        $pid = $args[1];
+        if (!trim($pid)) {
+          die ("Usage : t3tool page add <title> <parent's title or pid>");
+        }
+        if (!is_int($pid)) {
+          $pages = sql_get_rows("select uid from pages where title like '%ppid%'");
+          if (sizeof($pages) == 1) {
+            $pid = $pages[0]['pid'];
+          }
+        }
+        sql_query("insert into pages (hidden, title, pid) values (1, '$title', '$pid')");
+        break;
 
-      break;
+      //
+      // Delete a single page.
+      //
+      case 'delete' :
+        if (!trim($title)) {
+          die("Usage : t3tool page delete <title or uid>. Case insensitive.");
+        }
+        sql_query("update pages set deleted=1 where " . $where . " limit 1");
+        if (!sql_affected_rows()) {
+          die("Page not found.");
+        }
 
-    #
-    # Hide (disable) a page.
-    #
-    case "hide" :
-    case "disable" :
-      if (!trim($title)) {
-        die("Usage : t3tool page hide <title or uid>. Case insensitive.");
-      }
-      sql_query("update pages set hidden=1 where 1 " . $where . " limit 1");
-    if (!sql_affected_rows()) {
-      die("Page not found.");
-    }
-      break;
+        break;
 
-    #
-    # Unhide (enable) page.
-    #
-    case "unhide" :
-    case "enable" :
-      if (!trim($title)) {
-        die("Usage : t3tool page unhide <title or uid>. Case insensitive.");
-      }
-      sql_query("update pages set hidden=0 where 1 " . $where . " limit 1");
-    if (!sql_affected_rows()) {
-      die("Page not found.");
-    }
-      break;
+      //
+      // Hide (disable) a page.
+      //
+      case "hide" :
+      case "disable" :
+        if (!trim($title)) {
+          die("Usage : t3tool page hide <title or uid>. Case insensitive.");
+        }
+        sql_query("update pages set hidden=1 where 1 " . $where . " limit 1");
+        if (!sql_affected_rows()) {
+          die("Page not found.");
+        }
+        break;
 
-    default :
-      echo "Usage :
+      //
+      // Unhide (enable) page.
+      //
+      case "unhide" :
+      case "enable" :
+        if (!trim($title)) {
+          die("Usage : t3tool page unhide <title or uid>. Case insensitive.");
+        }
+        sql_query("update pages set hidden=0 where 1 " . $where . " limit 1");
+        if (!sql_affected_rows()) {
+          die("Page not found.");
+        }
+        break;
+
+      //
+      // Build a comma separated list of pages under a pid.
+      //
+      case 'pidlist' :
+        if (!$title) {
+          die("Usage: t3tool page pidlist <pid>");
+        }
+
+        $pids = getPids($title);
+        echo "There are " . count($pids) . " pages:\n";
+        echo (implode(",", $pids));
+        echo "\n\n";
+        break;
+
+      default :
+        echo "Usage :
         t3tool page add <title> <title or pid of parent page>
         t3tool page enable <title or uid>
         t3tool page disable <title or uid>
         t3tool page delete <title or uid>
+        t3tool page pidlist <uid>
     ";
 
+    }
   }
+
+function getPids($pid, $depth=100) {
+  $pages = sql_get_rows('select * from pages where pid=' . $pid);
+  if (!isset($pids)) {
+    $pids = array();
+  }
+  foreach ($pages as $page) {
+    $pids[] = $page['uid'];
+    $pids = array_merge($pids, getPids($page['uid']));
+  }
+  return $pids;
 }

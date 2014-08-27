@@ -1,0 +1,19 @@
+<?php
+/**
+ * Created by PhpStorm.
+ * User: Lars
+ * Date: 20-08-14
+ * Time: 09:27
+ */
+
+  function t3tool_show_handlecmd($args) {
+    $table = $args[0];
+    $uid = $args[1];
+
+    if (!$uid){
+      die("Usage: t3tool show <table> <uid>\n");
+    }
+    $record = getSingleRecordByString($table, $uid);
+    sendRecordAsTable($record);
+
+  }

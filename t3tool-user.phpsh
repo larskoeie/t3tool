@@ -18,24 +18,24 @@ function t3tool_user_handlecmd($args) {
 
   switch ($cmd) {
 
-    #
-    # Create admin user
-    #
+    //
+    // Create admin user
+    //
     case 'create' :
       $password = trim($args[1]);
-      if (!$password) {
-        $password = readline("Enter password for new user $username : ");
+      if (!$username) {
+        die("Usage: t3tool user create <username> [<password>]\n");
       }
       if (!$password) {
-        die("Usage: t3tool user create <username> [<password>]\n");
+        $password = readline("Enter password for new user $username : ");
       }
       sql_query("insert into be_users (username, password, admin) values ('$username', md5('$password'), 1)");
 
       break;
 
-    #
-    # Set user's password.
-    #
+    //
+    // Set user's password.
+    //
     case 'password' :
       $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
       $password = trim($args[1]);
@@ -45,12 +45,30 @@ function t3tool_user_handlecmd($args) {
       if (!$password) {
         die("Usage: t3tool user password <username> [<password>]\n");
       }
+      $GLOBALS['t3tool_data']['stored_passwords'][$user['uid']][time()] = $user['password'];
+      writeData();
       sql_query("update be_users set password=md5('$password') where uid=" . $user['uid']);
       break;
 
-    #
-    # List user groups
-    #
+    //
+    // Retrieve
+    // TODO : finish this or remove it
+    case 'passwordrevert' :
+      $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
+      if (! is_array($GLOBALS['t3tool_data']['stored_passwords'][$user['uid']])) {
+        die("No stored passwords for user\n");
+      }
+
+      $index = $args[1];
+      if (!trim($index)) {
+        die("Usage\n");
+
+      }
+
+      break;
+    //
+    // List user groups
+    //
     case 'groups' :
       $groups = getRecordsByString('be_groups', $username, array('title'));
 
@@ -65,17 +83,17 @@ function t3tool_user_handlecmd($args) {
 
       break;
 
-    #
-    # Find a user group and show all fields
-    #
+    //
+    // Find a user group and show all fields
+    //
     case 'showgroup' :
       $group = getSingleRecordByString('be_groups', $args[0], array('title'));
       sendRecordAsTable($group);
       break;
 
-    #
-    # Find members of a user group
-    #
+    //
+    // Find members of a user group
+    //
     case 'members' :
       $group = getSingleRecordByString('be_groups', $args[0], array('title'));
       $users = sql_get_rows('select uid, disable, username, email
@@ -84,9 +102,9 @@ function t3tool_user_handlecmd($args) {
       sendAsFlatTable($users);
       break;
 
-    #
-    # Add a group to a user
-    #
+    //
+    // Add a group to a user
+    //
     case 'addgroup' :
       $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
       $group = getSingleRecordByString('be_groups', $args[1], array('title'));
@@ -100,9 +118,9 @@ function t3tool_user_handlecmd($args) {
       sql_query('update be_users set usergroup="' . implode(',', $groups) . '" where uid = ' . $user['uid']);
       break;
 
-    #
-    # Remove a group from a user
-    #
+    //
+    // Remove a group from a user
+    //
     case 'rmgroup' :
       $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
       $group = getSingleRecordByString('be_groups', $args[1], array('title'));
@@ -112,25 +130,25 @@ function t3tool_user_handlecmd($args) {
       sql_query('update be_users set usergroup="' . implode(',', array_keys($groups)) . '" where uid = ' . $user['uid']);
       break;
 
-    #
-    # Make a user admin
-    #
+    //
+    // Make a user admin
+    //
     case 'setadmin' :
       $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
       sql_query('update be_users set admin=1 where uid = ' . $user['uid']);
       break;
 
-    #
-    # Make a user non-admin
-    #
+    //
+    // Make a user non-admin
+    //
     case 'clradmin' :
       $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
       sql_query('update be_users set admin=0     where uid = ' . $user['uid']);
       break;
 
-    #
-    # List users
-    #
+    //
+    // List users
+    //
     case 'list' :
       $users = getRecordsByString('be_users', $username, array('username', 'email'));
 
@@ -144,9 +162,9 @@ function t3tool_user_handlecmd($args) {
       sendAsFlatTable($users);
       break;
 
-    #
-    # Search for user(s) and show all fields.
-    #
+    //
+    // Search for user(s) and show all fields.
+    //
     case 'show' :
       if (!trim($username)) {
         die("Usage : t3tool user show <username, email or uid>. Case insensitive.\n");
@@ -156,9 +174,9 @@ function t3tool_user_handlecmd($args) {
       sendRecordAsTable($user);
       break;
 
-    #
-    # Enable single user.
-    #
+    //
+    // Enable single user.
+    //
     case 'enable' :
       if (!trim($username)) {
         die("Usage : t3tool user enable <username or uid>. Case insensitive.\n");
@@ -175,9 +193,9 @@ function t3tool_user_handlecmd($args) {
 
       break;
 
-    #
-    # Disable single user
-    #
+    //
+    // Disable single user
+    //
     case 'disable' :
       if (!trim($username)) {
         die("Usage : t3tool user disable <username or uid>. Case insensitive.");
@@ -194,12 +212,12 @@ function t3tool_user_handlecmd($args) {
 
       break;
 
-    #
-    # Delete single user.
-    #
+    //
+    // Delete single user.
+    //
     case 'delete' :
       if (!trim($username)) {
-        die("Usage : t3tool user disable <username or uid>. Case insensitive.");
+        die("Usage : t3tool user delete <username or uid>. Case insensitive. NO going back!");
       }
       $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
 
@@ -209,32 +227,32 @@ function t3tool_user_handlecmd($args) {
 
     default :
       die("Usage :
-      t3tool user list [<username, email or uid>]
-        List all users.
-      t3tool user show <username, email or uid>
-        Show details of single user.
-      t3tool user enable <username, email or uid>
-        Enable single user.
-      t3tool user disable <username, email or uid>
-        Disable single user.
-      t3tool user delete <username, email or uid>
-        Delete single user. NO going back !
-      t3tool user setadmin <username, email or uid>
-        Make user admin.
-      t3tool user clradmin <username, email or uid>
-        Make user non-admin.
-      t3tool user groups [<title>]
-        List all user groups or filtered by title.
-      t3tool user showgroup [<title>]
-        Show user groups with all fields.
-      t3tool user addgroup <username, email or uid> <group uid or title>
-        Add group to user.
-      t3tool user rmgroup <username, email or uid> <group uid or title>
-        Remove group from user.
-      t3tool user password <username, email or uid>
-        Set users password (passwrord will be prompted).
-      t3tool user create <username, email or uid>
-        Create admin user (password will be prompted).
+  t3tool user list [<username, email or uid>]
+    List all users.
+  t3tool user show <username, email or uid>
+    Show details of single user.
+  t3tool user enable <username, email or uid>
+    Enable single user.
+  t3tool user disable <username, email or uid>
+    Disable single user.
+  t3tool user delete <username, email or uid>
+    Delete single user. NO going back !
+  t3tool user setadmin <username, email or uid>
+    Make user admin.
+  t3tool user clradmin <username, email or uid>
+    Make user non-admin.
+  t3tool user groups [<title>]
+    List all user groups or filtered by title.
+  t3tool user showgroup [<title>]
+    Show user groups with all fields.
+  t3tool user addgroup <username, email or uid> <group uid or title>
+    Add group to user.
+  t3tool user rmgroup <username, email or uid> <group uid or title>
+    Remove group from user.
+  t3tool user password <username, email or uid>
+    Set users password (passwrord will be prompted).
+  t3tool user create <username, email or uid>
+    Create admin user (password will be prompted).
 
     ");
 

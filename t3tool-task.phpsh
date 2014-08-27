@@ -1,0 +1,131 @@
+<?php
+  /**
+   * t3tool-task.phpsh
+   *
+   * Handling of backend users and backend user groups.
+   *
+   * @package t3tool
+   * @author Lars Køie
+   *
+   */
+
+  /**
+   * @param $args
+   */
+  function t3tool_task_handlecmd($args) {
+    $cmd = strtolower(array_shift($args));
+    $query = trim(strtolower($args[0]));
+
+    switch ($cmd) {
+
+      //
+      // List users
+      //
+      case 'list' :
+        $tasks = getRecordsByString('tx_scheduler_task', $query, array('classname'), 'uid, disable, classname, nextexecution, lastexecution_time, serialized_task_object');
+
+        if (!$tasks) {
+          die("No matching tasks.\n");
+        }
+
+        foreach ($tasks as $i=>$task) {
+          $tasks[$i]['nextexecution'] = strftime('%d.%m.%Y %H.%M', $tasks[$i]['nextexecution']);
+          $tasks[$i]['lastexecution_time'] = strftime('%d.%m.%Y %H.%M', $tasks[$i]['lastexecution_time']);
+          if ($task['serialized_task_object']) {
+            $obj = @unserialize($task['serialized_task_object']);
+            $arr = get_object_vars($obj);
+            $tasks[$i]['classname'] = $arr['__PHP_Incomplete_Class_Name'];
+            $tasks[$i]['commandIdentifier'] = $arr['commandIdentifier'];
+            unset($tasks[$i]['serialized_task_object']);
+          }
+        }
+        sendAsFlatTable($tasks);
+        break;
+
+      //
+      // Search for task and show all fields.
+      //
+      case 'show' :
+        if (!trim($query)) {
+          die("Usage : t3tool task show <classname or uid>. Case insensitive.\n");
+        }
+        $task = getSingleRecordByString('tx_scheduler_task', $query, array('classname'));
+        if ($task['serialized_task_object']) {
+          $obj = @unserialize($task['serialized_task_object']);
+          $arr = get_object_vars($obj);
+          $task['classname'] = $arr['__PHP_Incomplete_Class_Name'];
+          $task['commandIdentifier'] = $arr['commandIdentifier'];
+
+        }
+
+
+        sendRecordAsTable($task);
+        print_r($arr);
+        break;
+
+      //
+      // Enable single task.
+      //
+      case 'enable' :
+        if (!trim($query)) {
+          die("Usage : t3tool task enable <classname or uid>. Case insensitive.\n");
+        }
+        $task = getSingleRecordByString('tx_scheduler_task', $query, array('classname'));
+
+        if ($task['disable'] == 0) {
+          die($task['classname'] . " already enabled.\n");
+        }
+
+        echo("Enabling task " . $task['classname'] . "... ");
+        sql_query("update tx_scheduler_task set disable=0 where uid= " . $task['uid'] . " limit 1");
+        echo "done.\n";
+
+        break;
+
+      //
+      // Disable single user
+      //
+      case 'disable' :
+        if (!trim($query)) {
+          die("Usage : t3tool task disable <classname or uid>. Case insensitive.");
+        }
+        $task = getSingleRecordByString('tx_scheduler_task', $query, array('classname'));
+
+        if ($task['disable'] == 1) {
+          die($task['classname'] . " already disabled.\n");
+        }
+        echo("Disabling task " . $task['classname'] . "... ");
+
+        sql_query("update tx_scheduler_task set disable=1 where uid =  " . $task['uid'] . " limit 1");
+        echo "done.\n";
+
+        break;
+
+      //
+      // Delete single task.
+      //
+      case 'delete' :
+        if (!trim($query)) {
+          die("Usage : t3tool task delete <classname or uid>. Case insensitive.");
+        }
+        $task = getSingleRecordByString('tx_scheduler_task', $query, array());
+
+        sql_query("delete from tx_scheduler_task where uid =  " . $task['uid'] . " limit 1");
+        echo $task['uid'] . " deleted.\n";
+        break;
+
+      default :
+        die("Usage :
+  t3tool task list [<classname or uid>]
+    List all users.
+  t3tool task enable <classname or uid>
+    Enable single user.
+  t3tool task disable <classname or uid>
+    Disable single user.
+  t3tool task delete <classname or uid>
+    Delete single user. NO going back !
+
+    ");
+
+    }
+  }

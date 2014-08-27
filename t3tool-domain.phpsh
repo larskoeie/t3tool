@@ -1,173 +1,269 @@
 <?php
-/**
- * t3tool-domain.phpsh
- *
- * Handles the command "t3tool domain ...".
- *
- * @package t3tool
- * @author Lars Køie
- *
- */
+  /**
+   * t3tool-domain.phpsh
+   *
+   * Handles the command "t3tool domain ...".
+   *
+   * @package t3tool
+   * @author Lars Køie
+   *
+   */
 
-/**
- * @param $args
- */
-function t3tool_domain_handlecmd($args) {
-  $cmd = array_shift($args);
-  $domain = trim(strtolower($args[0]));
+  /**
+   * @param $args
+   */
+  function t3tool_domain_handlecmd($args) {
+    $realurl_config = $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['realurl'];
+    $realurl_configured = (bool) $realurl_config;
 
-  switch ($cmd) {
+    $cmd = array_shift($args);
+    $domain = trim(strtolower($args[0]));
 
-    #
-    # List domains.
-    #
-    case 'list' :
-    case 'find' :
-      $domains = sql_get_rows("
+    switch ($cmd) {
+
+      //
+      // List domains.
+      //
+      case 'list' :
+      case 'find' :
+        $domains = sql_get_rows("
         select sys_domain.uid as uid, domainName, sys_domain.hidden, pages.uid as pid, pages.title as pageTitle, 'sys_domain' as _table
         from sys_domain
-        left join pages on pages.uid=sys_domain.pid order by sys_domain.pid asc, sys_domain.sorting asc"
-      );
+        left join pages on pages.uid=sys_domain.pid order by sys_domain.hidden asc, sys_domain.pid asc, sys_domain.sorting asc"
+        );
 
-      if ($cmd == 'list') {
-        sendAsFlatTable($domains);
-      }
-      if ($cmd == 'find') {
-        showRecordsInPageTree($domains);
-      }
-      break;
-
-    #
-    # Show a single domain with all fields.
-    #
-    case 'show' :
-      $domain = getSingleRecordByString('sys_domain', $domain, array('domainName'));
-      sendRecordAsTable($domain);
-      break;
-
-    #
-    # Add a domain record.
-    #
-    case 'add' :
-      $pid = $args[1];
-      if (!trim($pid)) {
-        die ("Usage : t3tool domain add <domainName> <pid>\n");
-      }
-      $page = getSingleRecordByString('pages', $pid);
-      $pagetitle = $page['title'];
-
-      echo "Adding domain $domain on page " . $pagetitle . "... ";
-      $domains = sql_get_rows("
-        select pages.uid, pages.title, domainName, sys_domain.hidden from sys_domain
-        left join pages on pages.uid=sys_domain.pid
-        where domainName like '$domain'"
-      );
-      if (sizeof($domains)) {
-        $pagetitle = $domains[0]['title'];
-        echo "already exists... ";
-        if ($domains[0]['hidden']) {
-          echo "enabling it... ";
-          sql_query("update sys_domain set hidden=0 where domainName like '$domain'");
-          echo "done.\n";
-        } else {
-          echo "skipping.\n";
+        if ($realurl_configured) {
+          foreach ($domains as $i=>$domain) {
+            if (isset($realurl_config[$domain['domainName']])) {
+              if ($realurl_config[$domain['domainName']]['pagePath']['rootpage_id'] == $domain['pid']) {
+                $domains[$i]['realurl'] = 'OK';
+              } else {
+                $domains[$i]['realurl'] = 'On pid ' . $realurl_config[$domain['domainName']]['pagePath']['rootpage_id'];
+              }
+            } else {
+              $domains[$i]['realurl'] = 'Not configured';
+            }
+          }
         }
-      } else {
-        sql_query("insert into sys_domain (hidden, domainName, pid) values (0, '$domain', '$pid')");
+        if ($cmd == 'list') {
+          sendAsFlatTable($domains);
+        }
+        if ($cmd == 'find') {
+          showRecordsInPageTree($domains);
+        }
+        break;
+
+      //
+      // DNS lookup of all domains.
+      //
+      case 'dns' :
+      case 'check' :
+      case 'dnsandcheck' :
+        $domains = sql_get_rows("
+        select sys_domain.uid as uid, domainName, sys_domain.hidden, pages.uid as pid, pages.title as pageTitle, 'sys_domain' as _table
+        from sys_domain
+        left join pages on pages.uid=sys_domain.pid order by sys_domain.hidden asc, sys_domain.pid asc, sys_domain.sorting asc"
+        );
+
+        if ($cmd == 'dns' || $cmd == 'dnsandcheck') {
+          foreach ($domains as $i => $domain) {
+            $ip = get_ip_address($domain['domainName']);
+            $domains[$i]['ip'] = $ip;
+          }
+        }
+
+        if ($cmd == 'check' || $cmd == 'dnsandcheck') {
+          foreach ($domains as $i => $domain) {
+            $domainname = $domain['domainName'];
+            $token = md5($domainname . time());
+            $filename = $token . '.html';
+            $data = $token;
+            file_put_contents(PATH_site . $filename, $data);
+            $url = 'http://' . $domainname . '/' . $filename;
+            // we are not interested in 404, hence the @
+            $check_data = @file_get_contents($url);
+            $domains[$i]['check'] = ($data == $check_data) ? 'Success' : 'Fail';
+            unlink(PATH_site . $filename);
+          }
+
+        }
+        sendAsFlatTable($domains);
+        break;
+
+      //
+      // Show a single domain with all fields.
+      //
+      case 'show' :
+        $domain = getSingleRecordByString('sys_domain', $domain, array('domainName'));
+        sendRecordAsTable($domain);
+        break;
+
+      //
+      // Add a domain
+      //
+      case 'add' :
+      case 'add-record' :
+      case 'add-realurl' :
+        $pid = $args[1];
+        if (!trim($pid)) {
+          die ("Usage : t3tool domain add <domainName> <pid>\n");
+        }
+        $page = getSingleRecordByString('pages', $pid);
+        $pid = $page['uid'];
+        $pagetitle = $page['title'];
+
+        if ($cmd == 'add' || $cmd == 'add-record') {
+          echo "Adding domain $domain on page " . $pagetitle . "... ";
+          $domains = sql_get_rows("
+          select pages.uid, pages.title, domainName, sys_domain.hidden from sys_domain
+          left join pages on pages.uid=sys_domain.pid
+          where domainName like '$domain'"
+          );
+          if (sizeof($domains)) {
+            $pagetitle = $domains[0]['title'];
+            echo "already exists... ";
+            if ($domains[0]['hidden']) {
+              echo "enabling it... ";
+              sql_query("update sys_domain set hidden=0 where domainName like '$domain'");
+              echo "done.\n";
+            } else {
+              echo "skipping.\n";
+            }
+          } else {
+            sql_query("insert into sys_domain (hidden, domainName, pid) values (0, '$domain', " . $page['uid'] . ")");
+            echo "done.\n";
+          }
+        }
+
+        if ($cmd == 'add' || $cmd == 'add-realurl') {
+          if ($realurl_configured) {
+            echo "Adding to realurl configuration... ";
+            $temp = each($realurl_config);
+            $firstdomain = $temp['key'];
+            appendToPHPFile(PATH_typo3conf . 'realurl_conf.php', "\$TYPO3_CONF_VARS['EXTCONF']['realurl']['$domain'] = \$TYPO3_CONF_VARS['EXTCONF']['realurl']['$firstdomain'];");
+            appendToPHPFile(PATH_typo3conf . 'realurl_conf.php', "\$TYPO3_CONF_VARS['EXTCONF']['realurl']['$domain']['pagePath']['rootpage_id'] = $pid;");
+            echo "done.\n";
+          } else {
+            echo "Realurl not configured.\n";
+          }
+        }
+        break;
+
+      //
+      // Delete a single domain.
+      //
+      case 'delete' :
+        if (!trim($domain)) {
+          die("Usage : t3tool domain delete <domainName or uid>. Case insensitive.");
+        }
+
+        sql_query("delete from sys_domain where uid = " . $domain['uid']);
+
+        break;
+
+      //
+      // Hide (disable) a domain name.
+      //
+      case "disable" :
+      case "hide" :
+        if (!trim($domain)) {
+          die("Usage : t3tool domain disable <domainName or uid>. Case insensitive.");
+        }
+        $domain = getSingleRecordByString('sys_domain', $domain, array('domainName'));
+        if ($domain['hidden'] == 1) {
+          die($domain['domainName'] . " already disabled.\n");
+        }
+
+        echo "Disabling " . $domain['domainName'] . "... ";
+        sql_query("update sys_domain set hidden=1 where uid = " . $domain['uid']);
         echo "done.\n";
-      }
 
-      break;
+        break;
 
-    #
-    # Delete a single domain.
-    #
-    case 'delete' :
-      if (!trim($domain)) {
-        die("Usage : t3tool domain delete <domainName or uid>. Case insensitive.");
-      }
+      //
+      // Unhide (enable) domain name.
+      //
+      case "enable" :
+      case "unhide" :
+        if (!trim($domain)) {
+          die("Usage : t3tool domain enable <domainName or uid>. Case insensitive.\n");
+        }
+        $domain = getSingleRecordByString('sys_domain', $domain, array('domainName'));
+        if ($domain['hidden'] == 0) {
+          die($domain['domainName'] . " already enabled.\n");
+        }
 
-      sql_query("delete from sys_domain where uid ) " . $domain['uid']);
+        echo "Enabling " . $domain['domainName'] . "... ";
+        sql_query("update sys_domain set hidden=0 where uid = " . $domain['uid']);
+        echo "done.\n";
 
-      break;
+        break;
 
-    #
-    # Hide (disable) a domain name.
-    #
-    case "disable" :
-    case "hide" :
-      if (!trim($domain)) {
-        die("Usage : t3tool domain disable <domainName or uid>. Case insensitive.");
-      }
-      $domain = getSingleRecordByString('sys_domain', $domain, array('domainName'));
-      if ($domain['hidden'] == 1) {
-        die($domain['domainName'] . " already disabled.\n");
-      }
+      //
+      // Move a single domain to top.
+      //
+      case 'movetotop' :
+        if (!trim($domain)) {
+          die("Usage : t3tool domain movetotop <domainName or uid>. Case insensitive.\n");
+        }
+        $domain = getSingleRecordByString('sys_domain', $domain, array('domainName'));
 
-      echo "Disabling " . $domain['domainName'] . "... ";
-      sql_query("update sys_domain set hidden=1 where uid = " . $domain['uid']);
-      echo "done.\n";
+        echo "Moving " . $domain['domainName'] . " to top... ";
+        sql_query("update sys_domain set sorting=sorting+1");
+        sql_query("update sys_domain set sorting=0 where uid = " . $domain['uid']);
+        echo "done.\n";
 
-      break;
+        break;
 
-    #
-    # Unhide (enable) domain name.
-    #
-    case "enable" :
-    case "unhide" :
-      if (!trim($domain)) {
-        die("Usage : t3tool domain enable <domainName or uid>. Case insensitive.\n");
-      }
-      $domain = getSingleRecordByString('sys_domain', $domain, array('domainName'));
-      if ($domain['hidden'] == 0) {
-        die($domain['domainName'] . " already enabled.\n");
-      }
 
-      echo "Enabling " . $domain['domainName'] . "... ";
-      sql_query("update sys_domain set hidden=0 where uid = " . $domain['uid']);
-      echo "done.\n";
+      default :
+        echo "Usage :
+  t3tool domain list
+  t3tool domain dns
+    Search for a DNS A-record for each domain, and list the IPs.
+  t3tool domain check
+    Create a unique file and retrieve it through that domain, list the result.
+  t3tool domain dnsandcheck
+    The two above, combined.
+  t3tool domain show <domain name>
+  t3tool domain add-record <domain name> <pid>
+    Add a domain record on a page.
+  t3tool domain add-realurl <domain name> <pid>
+    Add a domain name to a realurl configuration. Will gracefully do nothing if realurl is not configured.
+  t3tool domain add <domain name> <pid>
+    Both of the two above.
+  t3tool domain enable <domain name or uid>
+  t3tool domain movetotop <domain name or uid>
+  t3tool domain disable <domain name or uid>
+  t3tool domain delete <domain name or uid>
 
-      break;
-
-    #
-    # Move a single domain to top.
-    #
-    case 'movetotop' :
-      if (!trim($domain)) {
-        die("Usage : t3tool domain movetotop <domainName or uid>. Case insensitive.\n");
-      }
-      $domain = getSingleRecordByString('sys_domain', $domain, array('domainName'));
-
-      echo "Moving " . $domain['domainName'] . " to top... ";
-      sql_query("update sys_domain set sorting=sorting+1");
-      sql_query("update sys_domain set sorting=0 where uid = " . $domain['uid']);
-      echo "done.\n";
-
-      break;
-
-    default :
-      echo "Usage :
-        t3tool domain list
-        t3tool domain show <domain name>
-        t3tool domain add <domain name> <pid>
-        t3tool domain enable <domain name or uid>
-        t3tool domain movetotop <domain name or uid>
-        t3tool domain disable <domain name or uid>
-        t3tool domain delete <domain name or uid>
-
-        Domain name matches first exact, case insensitive. Then containing case insensitive.
+  Domain name matches first exact, case insensitive. Then containing case insensitive.
     ";
 
+    }
   }
-}
 
-function t3tool_domain_cmdaliases() {
-  return array(
-    'dblk' => 'domain disable',
-    'ddel' => 'domain delete',
-    'dcrt' => 'domain create',
-    'dinf' => 'domain show',
-    'dublk' => 'domain enable',
-  );
+  function get_ip_address($hostname) {
+    $ip = '';
+    $dnss = dns_get_record($hostname, DNS_A);
+    foreach ($dnss as $dns) {
+      switch ($dns['type']) {
+        case 'A' :
+          return $dns['ip'];
+          break;
+      }
+    }
+    return $ip;
 
-}
+  }
+
+  function t3tool_domain_cmdaliases() {
+    return array(
+      'dblk' => 'domain disable',
+      'ddel' => 'domain delete',
+      'dcrt' => 'domain create',
+      'dinf' => 'domain show',
+      'dublk' => 'domain enable',
+    );
+
+  }

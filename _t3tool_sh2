@@ -1,0 +1,12 @@
+#!/bin/sh
+
+t3tool.phpsh "$1" "$2" "$3" "$4" "$5"
+
+if [ -d ./typo3conf/ext/t3tool ]; then
+    if [ -z $1 ]; then
+        ./typo3/cli_dispatch.phpsh t3tool usage
+    else
+        ./typo3/cli_dispatch.phpsh t3tool $1 $2 $3 $4 $5
+    fi
+
+fi

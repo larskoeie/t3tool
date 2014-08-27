@@ -1,0 +1,191 @@
+<?php
+  /**
+   * t3tool-feuser.phpsh
+   *
+   * Handling of frontend users and frontend user groups.
+   *
+   * @package t3tool
+   * @author Lars Køie
+   *
+   */
+
+  /**
+   * @param $args
+   */
+  function t3tool_feuser_handlecmd($args) {
+    $cmd = strtolower(array_shift($args));
+    $username = trim($args[0]);
+
+    switch ($cmd) {
+      case 'list' :
+      case 'find' :
+        $feusers = getRecordsByString('fe_users', $username, array('username'), 'uid, pid, username, disable');
+        if ($cmd == 'list') {
+          sendAsFlatTable($feusers);
+        }
+        if ($cmd == 'find') {
+          showRecordsInPageTree($feusers, 'fe_users');
+        }
+        break;
+
+      //
+      // Create fe_user
+      //
+      case 'create' :
+        $password = trim($args[1]);
+        $pid = intval($args[2]);
+
+        if (!$password) {
+          $password = readline("Enter password for new frontend user $username : ");
+        }
+        if (!$password) {
+          die("Usage: t3tool feuser create <pid> <username> [<password>]\n");
+        }
+        sql_query("insert into fe_users (username, password, pid) values ('$username', '$password', $pid)");
+
+        break;
+
+      //
+      // Set fe_user's password.
+      //
+      case 'password' :
+        $user = getSingleRecordByString('fe_users', $username, array('username', 'email'));
+        $password = trim($args[1]);
+        if (!$password) {
+          $password = readline("Enter new password for frontend user $username : ");
+        }
+        if (!$password) {
+          die("Usage: t3tool feuser password <username> [<password>]\n");
+        }
+        sql_query("update fe_users set password='$password' where uid=" . $user['uid']);
+        break;
+
+      //
+      // List user groups
+      //
+      case 'groups' :
+        $groups = getRecordsByString('fe_groups', $username, array('title'), 'uid, title');
+
+        if (!$groups) {
+          die("No matching groups.\n");
+        }
+
+        sendAsFlatTable($groups);
+
+        break;
+
+      //
+      // Find a user group and show all fields
+      //
+      case 'showgroup' :
+        $group = getSingleRecordByString('fe_groups', $args[0], array('title'));
+        sendRecordAsTable($group);
+        break;
+
+      //
+      // Find members of a user group
+      //
+      case 'members' :
+        $group = getSingleRecordByString('fe_groups', $args[0], array('title'));
+        $users = sql_get_rows('select uid, disable, username, email
+      from fe_users
+      where find_in_set(' . $group['uid'] . ', usergroup)');
+        sendAsFlatTable($users);
+        break;
+
+      //
+      // Add a group to a user
+      //
+      case 'addgroup' :
+        $user = getSingleRecordByString('fe_users', $username, array('username', 'email'));
+        $group = getSingleRecordByString('fe_groups', $args[1], array('title'));
+        $groups = array();
+        if (trim($user['usergroup'])) {
+          $groups = explode(',', trim($user['usergroup']));
+        }
+        if (!in_array($group['uid'], $groups)) {
+          $groups[] = $group['uid'];
+        }
+        sql_query('update fe_users set usergroup="' . implode(',', $groups) . '" where uid = ' . $user['uid']);
+        break;
+
+      //
+      // Remove a group from a user
+      //
+      case 'rmgroup' :
+        $user = getSingleRecordByString('fe_users', $username, array('username', 'email'));
+        $group = getSingleRecordByString('fe_groups', $args[1], array('title'));
+        $groups = array_fill_keys(explode(',', trim($user['usergroup'])), TRUE);
+        unset($groups[$group['uid']]);
+
+        sql_query('update fe_users set usergroup="' . implode(',', array_keys($groups)) . '" where uid = ' . $user['uid']);
+        break;
+
+      //
+      // Search for user(s) and show all fields.
+      //
+      case 'show' :
+        if (!trim($username)) {
+          die("Usage : t3tool feuser show <username, email or uid>. Case insensitive.\n");
+        }
+        $user = getSingleRecordByString('fe_users', $username, array('username', 'email'));
+
+        sendRecordAsTable($user);
+        break;
+
+      //
+      // Enable single user.
+      //
+      case 'enable' :
+        if (!trim($username)) {
+          die("Usage : t3tool feuser enable <username or uid>. Case insensitive.\n");
+        }
+        $user = getSingleRecordByString('fe_users', $username, array('username', 'email'));
+
+        if ($user['disable'] == 0) {
+          die($user['username'] . " already enabled.\n");
+        }
+
+        echo("Enabling user " . $user['username'] . "... ");
+        sql_query("update fe_users set disable=0 where uid= " . $user['uid'] . " limit 1");
+        echo "done.\n";
+
+        break;
+
+      //
+      // Disable single user
+      //
+      case 'disable' :
+        if (!trim($username)) {
+          die("Usage : t3tool feuser disable <username or uid>. Case insensitive.");
+        }
+        $user = getSingleRecordByString('fe_users', $username, array('username', 'email'));
+
+        if ($user['disable'] == 1) {
+          die($user['username'] . " already disabled.\n");
+        }
+        echo("Disabling user " . $user['username'] . "... ");
+
+        sql_query("update fe_users set disable=1 where uid =  " . $user['uid'] . " limit 1");
+        echo "done.\n";
+
+        break;
+
+      //
+      // Delete single user.
+      //
+      case 'delete' :
+        if (!trim($username)) {
+          die("Usage : t3tool feuser delete <username or uid>. Case insensitive.");
+        }
+        $user = getSingleRecordByString('fe_users', $username, array('username', 'email'));
+
+        sql_query("delete from fe_users where uid =  " . $user['uid'] . " limit 1");
+        echo $user['username'] . " deleted.\n";
+        break;
+
+
+    }
+
+  }
+
