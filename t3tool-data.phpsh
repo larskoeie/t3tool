@@ -1,0 +1,30 @@
+<?php
+  /**
+   * Created by PhpStorm.
+   * User: Lars
+   * Date: 28-08-14
+   * Time: 19:55
+   */
+
+
+  function t3tool_data_handlecmd($args) {
+    $cmd = array_shift($args);
+
+    switch ($cmd) {
+
+      case 'export-table-as-array' :
+        $table = $args[0];
+
+        $rows = sql_get_rows("select * from $table order by uid");
+        foreach ($rows as $i => $row) {
+          unset($rows[$i]['uid']);
+          unset($rows[$i]['pid']);
+        }
+        echo '<?php $data=' . var_export($rows, 1). ';';
+
+
+        break;
+
+    }
+
+  }

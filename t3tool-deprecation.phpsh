@@ -1,0 +1,57 @@
+<?php
+  /**
+   * Created by PhpStorm.
+   * User: Lars
+   * Date: 02-09-14
+   * Time: 14:37
+   */
+
+  function t3tool_deprecation_handleCmd($args) {
+
+    $cmd = array_shift($args);
+    require_once('t3tool-deprecated-data.php');
+    $GLOBALS['deprecation_data'] = $data;
+    switch ($cmd) {
+
+      case 'list' :
+        $root = PATH_site . 'typo3conf/ext/';
+        $report = array();
+        t3tool_deprecation_opendir($root, '', $report);
+        print_r($report);
+        break;
+    }
+
+
+  }
+
+  function t3tool_deprecation_opendir($root, $path, &$report) {
+
+    $dh = opendir($root . $path);
+    while ($file = readdir($dh)) {
+      if ($file{0} == '.') {
+        continue;
+      }
+
+      if (is_file($root . $path . $file)) {
+        if (!preg_match('/\.php$', $file)) {
+          continue;
+        }
+        $data = file_get_contents($root . $path . $file);
+        foreach ($GLOBALS['deprecation_data'] as $dep) {
+         print_r($dep);
+          // only handle static
+          $deprecated = FALSE;
+          if ($dep['is_static'] && preg_match(';' . $dep['class'] . '::' . $dep['method'] . ';i')) {
+            $deprecated = TRUE;
+          }
+
+          $report[$path . $file][] = $dep['class'] . '::' . $dep['method'] . ' : ' . $dep['message'];
+
+        }
+      }
+
+      if (is_dir($root . $path . $file)) {
+        t3tool_deprecation_opendir($root, $path . $file, $report);
+      }
+    }
+  }

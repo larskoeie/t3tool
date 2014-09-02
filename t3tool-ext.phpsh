@@ -75,12 +75,13 @@
       case 'list' :
         foreach ($EM_CONF as $extkey => $config) {
           if (!$ext || preg_match("/$ext/", $extkey) || preg_match("/$ext/", $config['title'])) {
-            $extlist[] = array(
+            $extdata = array(
               'key' => $extkey,
               'title' => $config['title'],
               'version' => $config['version'],
               'type' => $config['added by t3tool']['type'],
             );
+            $extlist[] = $extdata;
           }
         }
         echo "Installed extensions:\n";
@@ -216,37 +217,50 @@
 
 
       case 'report' :
+$filter = strtolower($args[0]);
 
         $projects = array();
 
         foreach ($EM_CONF as $extKey => $info) {
 
-          $secureVersion = getSecureVersion($extKey, $info['version']);
-          $latestVersion = getLatestVersion($extKey, $info['version']);
-
-          $projectUpdate = $latestVersion != $info['version'];
-          $projectSecurity = $secureVersion != $info['version'];
-
           $project = array(
             'extension' => $extKey,
             'installed' => $info['version'],
-            'latest' => $latestVersion,
+            'latest' => '',
+            'type' => $info['added by t3tool']['type'],
             'status' => '',
+
           );
 
-          if ($projectUpdate) {
-            $project['status'] = 'Update';
-          }
-          if ($projectSecurity) {
-            $project['status'] = 'SECURITY update';
+          if (in_array($filter, array('local', 'system', 'global')) && $filter!=strtolower($project['type']))
+            continue;
+
+          if ($project['type'] != 'Local' || isInTer($extKey)) {
+            $secureVersion = getSecureVersion($extKey, $info['version']);
+            $latestVersion = getLatestVersion($extKey, $info['version']);
+
+            $project['latest'] = $latestVersion;
+
+            $projectUpdate = $latestVersion != $info['version'];
+            $projectSecurity = $secureVersion != $info['version'];
+
+
+            if ($projectUpdate) {
+              $project['status'] = 'Update';
+            }
+            if ($projectSecurity) {
+              $project['status'] = 'SECURITY update';
+            }
+          } else {
+            $project['status'] = 'Not in TER';
+
           }
 
           $siteUpdate |= $projectUpdate;
           $siteSecurity |= $projectSecurity;
 
-          if ($projectUpdate) {
             $projects[] = $project;
-          }
+
         }
 
         sendAsFlatTable($projects);
@@ -265,6 +279,17 @@
     }
   }
 
+
+  function isInTer ($extKey) {
+    global $TYPO3_DB;
+    $intVer = convertVersionNumberToInteger($curVersion);
+    $res = sql_query('SELECT * FROM cache_extensions WHERE extkey = "' . $extKey . '"');
+    if ($row = sql_fetch_assoc($res)) {
+      return TRUE;
+    }
+
+    return FALSE;
+  }
 
   function getSecureVersion($extKey, $curVersion) {
     global $TYPO3_DB;
@@ -299,7 +324,7 @@
     $versionParts = explode('.', $versionNumber);
 
     return intval(((int)$versionParts[0] . str_pad((int)$versionParts[1], 3, '0', STR_PAD_LEFT)) . str_pad((int)$versionParts[2], 3, '0', STR_PAD_LEFT));
-        }
+  }
 
 
 

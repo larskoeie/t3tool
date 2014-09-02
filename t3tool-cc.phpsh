@@ -16,43 +16,28 @@
     $cmd = strtolower(array_shift($args));
 
     switch ($cmd) {
-
-      //
       // Truncate all cache tables.
-      //
       case 'content' :
-      case 'all' :
-        $tables = sql_get_rows('show tables');
-        foreach ($tables as $t) {
-          $t = array_values($t);
-
-          $table = $t[0];
-          if (preg_match('/^(cache)|(cf)_/', $table)) {
-            sql_query("truncate $table;");
-            $tablecount ++;
-          }
-        }
-        echo "Truncated $tablecount cache tables.\n";
-
+        t3tool_cc_content();
         break;
 
-      //
       // Delete cached code.
-      //
       case 'config' :
-      case 'all' :
-        if ($GLOBALS['version_4']) {
-          var_dump(passthru("pwd; rm -rf typo3conf/temp_CACHED_*"));
-        }
-        if ($GLOBALS['version_6']) {
-          var_dump(passthru("pwd; rm -rf typo3temp/Cache/Code"));
-        }
+        t3tool_cc_config();
         break;
 
-      //
+      // both of the above
+      case 'all' :
+        t3tool_cc_content();
+        t3tool_cc_config();
+        break;
+
       // Empty typo3temp/pics.
-      //
       case 'pics' :
+        break;
+
+      // Realurl cache
+      case 'realurl' :
         break;
 
       default :
@@ -65,7 +50,20 @@
     All of the above.
   t3tool cc pics
     Empties typo3temp/pics.
+
   ");
     }
+
+  }
+
+  function t3tool_cc_content() {
+    sql_query("truncate cache_pages;");
+    sql_query("truncate cache_pagesection;");
+
+    echo "Truncated 2 cache tables.\n";
+
+  }
+
+  function t3tool_cc_config() {
 
   }

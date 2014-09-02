@@ -1,0 +1,29 @@
+<?php
+  /**
+   * t3tool-php.phpsh
+   *
+   * Handles the command "t3tool php <php>".
+   *
+   * @package t3tool
+   * @author Lars Køie
+   *
+   */
+
+  /**
+   * @param $args array Arguments.
+   *
+   */
+  function t3tool_php_handlecmd($args) {
+    $php = $args[0];
+
+    if (!trim($php)) {
+      die("Usage:
+      t3tool php <php>
+        Will run an sql query on TYPO3 database and output the result if any.
+      ");
+    }
+
+    $result = eval($php);
+    echo "\n";
+
+  }

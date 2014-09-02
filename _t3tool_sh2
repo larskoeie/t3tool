@@ -1,12 +1,31 @@
 #!/bin/sh
 
-t3tool.phpsh "$1" "$2" "$3" "$4" "$5"
 
-if [ -d ./typo3conf/ext/t3tool ]; then
-    if [ -z $1 ]; then
-        ./typo3/cli_dispatch.phpsh t3tool usage
-    else
-        ./typo3/cli_dispatch.phpsh t3tool $1 $2 $3 $4 $5
-    fi
+# The goal of this routine is to allow for script execution inside the web root
+# of a site, or one level above the web root. The latter requires that the web
+# root directory is called "http".
+#
 
+wd=`pwd`
+sd=$wd
+while [ ! -d "./typo3conf/" ] && [ $wd != '/' ]
+do
+  cd ..
+  wd=`pwd`
+done
+
+if [ ! -d "./typo3conf/" ]
+then
+  cd $sd
+  if [ -d "./http/typo3conf/" ]
+  then
+    cd "http"
+  else
+    echo "Could not find TYPO3 site."
+    exit;
+  fi
 fi
+
+
+t3tool-go.phpsh "$1" "$2" "$3" "$4" "$5"
+
