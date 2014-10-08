@@ -143,7 +143,9 @@ function t3tool_user_handlecmd($args) {
     //
     case 'clradmin' :
       $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
+      echo "Removing admin role from " . $user['username'] . "... ";
       sql_query('update be_users set admin=0     where uid = ' . $user['uid']);
+      echo "done.";
       break;
 
     //
@@ -170,6 +172,9 @@ function t3tool_user_handlecmd($args) {
         die("Usage : t3tool user show <username, email or uid>. Case insensitive.\n");
       }
       $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
+      if (trim($user['uc'])) {
+        $user['uc'] = unserialize($user['uc']);
+      }
 
       sendRecordAsTable($user);
       break;

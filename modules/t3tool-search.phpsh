@@ -59,6 +59,7 @@
     if (isset($search_fields[$table])) {
       foreach ($search_fields[$table] as $field => $conf) {
         $or .= ' or t.' . $field . ' like "%' . $q . '%"';
+        $select .= ',t.' . $field;
       }
     }
     $or .= ')';
@@ -66,10 +67,10 @@
 
     $sql = "
     select t.$lab as title, t.uid, t.pid, t.hidden,
-    '$table' as _table
+    '$table' as _table  $select
     from $table as t 
     left join pages as p on (p.uid=t.pid) 
-    where 1 " . $where . "  
+    where 1 " . $where . getDeleteClause($table, 't') . "
     group by t.uid
     ";
 
@@ -77,11 +78,12 @@
 
     $rows = array();
     while ($row = sql_fetch_array($res)) {
-      $row['body'] = cropAndHilite($row['body'], $query);
+      $row['_match'] = cropAndHilite($row['config'], $q);
       $row['_table'] = $table;
       $rows[] = $row;
 
     }
+    print_r($rows);
     showRecordsInPageTree($rows);
 
   }

@@ -8,43 +8,26 @@
    *
    */
 
+  while (!is_dir('typo3conf') && getcwd() != '/') {
+    chdir('..');
+  }
+  if (!is_dir('typo3conf')) {
+    die('TYPO3 not found');
+  }
+
   # init
   error_reporting(E_ALL ^ E_NOTICE ^ E_DEPRECATED);
-//  error_reporting(E_ALL);
+  //  error_reporting(E_ALL);
 
-  global $TYPO3_CONF_VARS;
   define('PATH_site', getcwd() . '/');
-  define('PATH_typo3conf', getcwd() . '/typo3conf/');
+  define('PATH_typo3conf', PATH_site . 'typo3conf/');
+  define('PATH_t3lib', PATH_site . 't3lib/');
   readData();
-  if (is_file(PATH_typo3conf . 'localconf.php')) {
-    require('typo3conf/localconf.php');
-    $GLOBALS['version_4'] = TRUE;
-  }
-  if (is_file(PATH_typo3conf . 'LocalConfiguration.php')) {
-    $TYPO3_CONF_VARS = include(PATH_typo3conf . 'LocalConfiguration.php');
-    if (is_file(PATH_typo3conf . 'AdditionalConfiguration.php')) {
-      include(PATH_typo3conf . 'AdditionalConfiguration.php');
-    }
-    $db = $TYPO3_CONF_VARS['DB'];
-    $typo_db_host = $db['host'];
-    $typo_db_username = $db['username'];
-    $typo_db_password = $db['password'];
-    $typo_db = $db['database'];
-    $GLOBALS['version_6'] = TRUE;
-  }
 
-  // realurl ?
-  if (is_file(PATH_typo3conf . 'realurl_conf.php')) {
-  require_once(PATH_typo3conf . 'realurl_conf.php');
-  }
+  $GLOBALS['version_4'] = is_file(PATH_typo3conf . 'localconf.php');
+  $GLOBALS['version_6'] = is_file(PATH_typo3conf . 'LocalConfiguration.php');
 
-  if (!$typo_db) {
-    die("Error: t3tool requires a functional TYPO3 installation. Apparently you have no DB credentials. Are you in PATH_site ?\n\n");
-  }
-
-  # connect to db
-  $mysqli = mysqli_connect($typo_db_host, $typo_db_username, $typo_db_password);
-  mysqli_select_db($mysqli, $typo_db);
+  readConf();
 
   // part of TCA
   $label = array(
@@ -56,21 +39,35 @@
   );
 
   // split arguments and flag
-  foreach ($argv as $i=>$arg) {
-    if ($arg{0} == '-')  {
-      $flags[substr($arg, 1)] = TRUE;
+  /**
+   * Flags are :
+   * - d : include deleted records in lists and searches. Default is "exclude deleted records".
+   * - l : "local configuration" : Changes to configuration are written to the local one, the one in .gitignore (localconf_local or AdditionalConfiguration).
+   * - p : "pid" - all operations are filtered to elements on this pid - not implemented yet
+   * - r : "recursive" - infinitely - not implemented yet
+   */
+  foreach ($argv as $i => $arg) {
+    if ($arg{0} == '-') {
+      if ($arg{1} == '-') {
+
+      } else {
+        $flag = $arg{1};
+        $val = substr($arg, 2);
+        $GLOBALS['flags'][$flag] = $val ? $val : TRUE;
+      }
     } else {
       $args[] = $arg;
     }
   }
+  var_dump($GLOBALS['flags']);
 
   array_shift($args);
   $module = array_shift($args);
 
-  $modules = array('alldomains', 'allusers', 'cc', 'data', 'deprecation', 'domain', 'ext', 'feuser', 'log', 'page', 'plugin', 'search', 'show', 'sqlq', 'user', 'task', 'template');
+  $modules = array('alldomains', 'allusers', 'cc', 'config', 'data', 'deprecation', 'domain', 'ext', 'feuser', 'log', 'page', 'plugin', 'search', 'show', 'sqlq', 'user', 'task', 'template');
   $aliases = array();
   foreach ($modules as $m) {
-    require_once("t3tool-$m.phpsh");
+    require_once("modules/t3tool-$m.phpsh");
     $function = 't3tool_' . $m . '_cmdaliases';
     if (function_exists($function)) {
       $aliases = array_merge($aliases, $function());
@@ -138,11 +135,6 @@
       }
       break;
 
-    case 'template' :
-    case 'tpl' :
-      require_once('t3tool-template.phpsh');
-      break;
-
     case 'config' :
     case 'tca' :
     case 'ts' :
@@ -193,6 +185,61 @@
     }
   }
 
+  function readConf() {
+    global $TYPO3_CONF_VARS;
+
+    if ($GLOBALS['version_4']) {
+      require('typo3conf/localconf.php');
+    }
+    if ($GLOBALS['version_6']) {
+      $TYPO3_CONF_VARS = include(PATH_typo3conf . 'LocalConfiguration.php');
+      if (is_file(PATH_typo3conf . 'AdditionalConfiguration.php')) {
+        include(PATH_typo3conf . 'AdditionalConfiguration.php');
+      }
+    }
+
+    // realurl ?
+    if (isset($GLOBALS['TYPO3_CONF_VARS']['EXT']['extConf']['realurl'])) {
+      $GLOBALS['realurl']['config'] = unserialize($GLOBALS['TYPO3_CONF_VARS']['EXT']['extConf']['realurl']);
+      if (isset($config['configFile'])) {
+        $GLOBALS['realurlConfigFile'] = $GLOBALS['realurl']['config']['configFile'];
+        require_once(PATH_site . $GLOBALS['realurl']['config']['configFile']);
+      }
+    }
+
+  }
+
+  function initDB() {
+    if ($GLOBALS['DBIsInited']) {
+      return TRUE;
+    }
+    readConf();
+    global $TYPO3_CONF_VARS;
+    echo "Connecting to database ...";
+
+    $db = $TYPO3_CONF_VARS['DB'];
+    $typo_db_host = $db['host'];
+    $typo_db_username = $db['username'];
+    $typo_db_password = $db['password'];
+    $typo_db = $db['database'];
+
+    if (!$typo_db) {
+      die("Error: t3tool requires a functional TYPO3 installation. Apparently you have no DB credentials. Are you in PATH_site ?\n\n");
+    }
+
+    # connect to db
+    global $mysqli;
+    $mysqli = mysqli_connect($typo_db_host, $typo_db_username, $typo_db_password);
+    mysqli_select_db($mysqli, $typo_db);
+
+    $GLOBALS['DBIsInited'] = TRUE;
+
+    echo "ok.\n";
+
+    return TRUE;
+
+  }
+
   /**
    * @param $sql
    *
@@ -200,6 +247,7 @@
    *
    */
   function sql_query($sql) {
+    initDB();
     global $mysqli;
     $res = mysqli_query($mysqli, $sql);
     //   print "$sql\n\n";
@@ -450,18 +498,28 @@
    * @param $alias
    */
   function getDeleteClause($table, $alias = '') {
-    if ($alias !== '') {
-      $table = $alias;
+    if (getFlag('d')) {
+      return '';
+    }
+    if ($alias == '') {
+      $alias = $table;
     }
 
     // these tables have field deleted
-    if (in_array($table, array('pages', 'tt_content'))) {
+    if (in_array($table, array('pages', 'sys_template', 'tt_content'))) {
       // all others have
-      return " and not $table.deleted";
+      return " and not $alias.deleted";
     }
 
-
     return '';
+  }
+
+  function getFlag($f) {
+    if (!isset($GLOBALS['flags'][$f])) {
+      return FALSE;
+    }
+
+    return (bool)$GLOBALS['flags'][$f];
   }
 
   /**
@@ -471,7 +529,7 @@
    * @param $fields
    * @param $q
    */
-  function getWhereByString($table, $q='', $fields = array()) {
+  function getWhereByString($table, $q = '', $fields = array()) {
     if (!is_array($fields)) {
       $fields = explode(',', $fields);
     }
@@ -481,10 +539,10 @@
     if (intval($q)) {
       $where .= " and uid=" . $q . getDeleteClause($table);
 
-        $matches = sql_get_rows("select * from $table where 1 " . $where);
- if (sizeof($matches) == 1) {
+      $matches = sql_get_rows("select * from $table where 1 " . $where);
+      if (sizeof($matches) == 1) {
         return $where;
- }
+      }
     }
 
     if ($q) {
@@ -521,21 +579,21 @@
    *
    * @return array|bool
    */
-  function getRecordsByString($table, $q='', $fields = array(), $selectFields = '*') {
-   if ($table == 'pages') {
-     // handle special "magic" shorthands
-        switch ($q) {
-          case 'FIRSTROOT' :
-            if ($page = getFirstRootpage()) {
-                $q = $page['uid'];
-            }
-            break;
-            default :
-        }
-
+  function getRecordsByString($table, $q = '', $fields = array(), $selectFields = '*') {
+    if ($table == 'pages') {
+      // handle special "magic" shorthands
+      switch ($q) {
+        case 'FIRSTROOT' :
+          if ($page = getFirstRootpage()) {
+            $q = $page['uid'];
+          }
+          break;
+        default :
       }
 
-   $matches = sql_get_rows("select $selectFields from $table where 1 " . getWhereByString($table, $q, $fields));
+    }
+
+    $matches = sql_get_rows("select $selectFields from $table where 1 " . getWhereByString($table, $q, $fields));
 
     return $matches;
   }
@@ -563,7 +621,7 @@
   }
 
 
-  function getFirstRootpage ($pid=0) {
+  function getFirstRootpage($pid = 0) {
     $pages = sql_get_rows("
         select pages.uid, pages.pid, is_siteroot, title, domainName
         from pages left join sys_domain on sys_domain.pid=pages.uid
@@ -572,12 +630,14 @@
         ");
 
     foreach ($pages as $page) {
-        if ($page['is_siteroot'] && $page['domainName'])
-            return $page;
+      if ($page['is_siteroot'] && $page['domainName']) {
+        return $page;
+      }
 
-        $temp = getFirstRootPage($page['uid']);
-        if (is_array($temp))
-            return $temp;
+      $temp = getFirstRootPage($page['uid']);
+      if (is_array($temp)) {
+        return $temp;
+      }
     }
 
     return FALSE;
@@ -601,6 +661,8 @@
     }
     foreach ($values as $k => $v) {
       if (is_object($v)) {
+        $values[$k] = print_r($values[$k], 1);
+      } elseif (is_array($v)) {
         $values[$k] = print_r($values[$k], 1);
       } else {
         $values[$k] = preg_replace(";\n|\r\t;", ' ', $values[$k]);
@@ -742,17 +804,18 @@
       echo '| ';
 
       echo implode(' | ', array(
-          $row['_table'],
-          $row['uid'],
-          $row['pid'],
-          $row['deleted'],
-          $row['title'],
-        )) . "\n";
+        $row['_table'],
+        $row['uid'],
+        $row['pid'],
+        $row['deleted'],
+        $row['title'],
+      ));
 
       if (isset($row['_match'])) {
-        echo $row['_match'] . "\n";
+        echo preg_replace("/\n|\r|\t/", ' ', $row['_match']);
       }
 
+      echo "\n";
 
       if (isset($row['_'])) {
         foreach ($row['_'] as $table => $records) {
@@ -763,59 +826,84 @@
 
   }
 
-  /**
-   * Append a line to local
-   *
-   */
-  function writeToLocalConf($s) {
-    if (file_exists(PATH_typo3conf . 'localconf.php')) {
-      $lc = fopen(PATH_typo3conf . 'localconf.php', 'a');
-      fwrite($lc, $s . "\n");
-      fclose($lc);
-    }
-    if (file_exists(PATH_typo3conf . 'LocalConfiguration.php')) {
-        $lc = fopen(PATH_typo3conf . 'LocalConfiguration.php', 'a');
-        fwrite($lc, $s . "\n");
-        fclose($lc);
+
+  function setLocalConf($path, $value, $local = NULL) {
+    $path = explode('.', $path);
+
+    $data = & $GLOBALS['TYPO3_CONF_VARS'];
+    $exists = TRUE;
+    foreach ($path as $index) {
+      if (!isset($data[$index])) {
+        $exists = FALSE;
       }
+      $data = & $data[$index];
     }
+    $olddata = $data;
+    $data = $value;
+
+    $filename = getConfFilename($local);
+
+    if ($GLOBALS['version_4'] || $local) {
+      appendToPHPFile($filename, "\$GLOBALS['TYPO3_CONF_VARS']['" . implode("']['", $path) . "'] = " . var_export($value, 1) . ";\n");
+    } else {
+      // TODO : this will write entire array, including stuff from local, which it should not.....
+      file_put_contents($filename, '<?php return ' . var_export($GLOBALS['TYPO3_CONF_VARS'], 1) . ';');
+    }
+    echo "ok.\n";
+
+  }
+
+  function getConfFilename ($local) {
+    $filename = 'typo3conf/';
+    if ($GLOBALS['version_4']) {
+      $filename .= $local ? 'localconf_local.php' : 'localconf.php';
+    } else {
+      $filename .= $local ? 'AdditionalConfiguration.php' : 'LocalConfiguration.php';
+    }
+    return $filename;
+  }
 
   /**
-   * Append a line to local-local
+   * @param      $path dot separated list of keys
+   * @param null $local
    *
+   * @return bool
    */
-  function writeToLocalConfLocal($s) {
-  error_reporting(E_ALL);
-    if ($GLOBALS['version_4']) {
-    $filename = PATH_typo3conf . 'localconf_local.php';
-    } else {
-        $filename = PATH_typo3conf . 'AdditionalConfiguration.php';
-
+  function getLocalConf($path) {
+    $data = $GLOBALS['TYPO3_CONF_VARS'];
+    foreach (explode('.', $path) as $index) {
+      if (!isset($data[$index])) {
+        return NULL;
+      }
+      $data = $data[$index];
     }
-appendToPHPFile ($filename, $s);
-}
 
-function appendToPHPFile ($filename, $s) {
+    return $data;
+  }
+
+
+
+  function appendToPHPFile($filename, $s) {
     $data = "";
     if (file_exists($filename)) {
-        $data = file_get_contents($filename);
-$data = str_replace('?>', '', $data);
+      $data = file_get_contents($filename);
+      $data = str_replace('?>', '', $data);
     }
     if (!preg_match(';<\?php;', $data)) {
-        $data = "<?php\n" . $data;
+      $data = "<?php\n" . $data;
 
     }
 
     $data = $data . "\n" . $s;
-  file_put_contents ($filename, $data);
+    file_put_contents($filename, $data);
 
-     }
+  }
 
   /**
    * @param $data
    */
   function writeData() {
-    file_put_contents(PATH_site . '.t3tool_data.php', '<?php $GLOBALS["t3tool_data"] = ' . var_export($GLOBALS['t3tool_data'], 1). ';');
+    file_put_contents(PATH_site . '.t3tool_data.php', '<?php $GLOBALS["t3tool_data"] = ' . var_export($GLOBALS['t3tool_data'], 1) . ';');
   }
 
   /**

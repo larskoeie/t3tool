@@ -34,8 +34,8 @@
 
         if ($realurl_configured) {
           foreach ($domains as $i=>$domain) {
-            if (isset($realurl_config[$domain['domainName']])) {
-              if ($realurl_config[$domain['domainName']]['pagePath']['rootpage_id'] == $domain['pid']) {
+            if (isset($GLOBALS['TYPO3_CONF_VARS']['EXTCONF'][$domain['domainName']])) {
+              if ($GLOBALS['TYPO3_CONF_VARS']['EXTCONF'][$domain['domainName']]['pagePath']['rootpage_id'] == $domain['pid']) {
                 $domains[$i]['realurl'] = 'OK';
               } else {
                 $domains[$i]['realurl'] = 'On pid ' . $realurl_config[$domain['domainName']]['pagePath']['rootpage_id'];
@@ -135,18 +135,20 @@
           }
         }
 
-        if ($cmd == 'add' || $cmd == 'add-realurl') {
-          if ($realurl_configured) {
+
+        /*if ($cmd == 'add' || $cmd == 'add-realurl') {
+          if (is_array($GLOBALS['realurl']['config'])) {
             echo "Adding to realurl configuration... ";
             $temp = each($realurl_config);
             $firstdomain = $temp['key'];
-            appendToPHPFile(PATH_typo3conf . 'realurl_conf.php', "\$TYPO3_CONF_VARS['EXTCONF']['realurl']['$domain'] = \$TYPO3_CONF_VARS['EXTCONF']['realurl']['$firstdomain'];");
-            appendToPHPFile(PATH_typo3conf . 'realurl_conf.php', "\$TYPO3_CONF_VARS['EXTCONF']['realurl']['$domain']['pagePath']['rootpage_id'] = $pid;");
+            appendToPHPFile(PATH_site . $GLOBALS['realurl']['config']['configFile'], "\$TYPO3_CONF_VARS['EXTCONF']['realurl']['$domain'] = \$TYPO3_CONF_VARS['EXTCONF']['realurl']['$firstdomain'];");
+            appendToPHPFile(PATH_site . $GLOBALS['realurl']['config']['configFile'], "\$TYPO3_CONF_VARS['EXTCONF']['realurl']['$domain']['pagePath']['rootpage_id'] = $pid;");
             echo "done.\n";
           } else {
             echo "Realurl not configured.\n";
           }
         }
+        */
         break;
 
       //

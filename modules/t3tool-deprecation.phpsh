@@ -38,7 +38,6 @@
         }
         $data = file_get_contents($root . $path . $file);
         foreach ($GLOBALS['deprecation_data'] as $dep) {
-         print_r($dep);
           // only handle static
           $deprecated = FALSE;
           if ($dep['is_static'] && preg_match(';' . $dep['class'] . '::' . $dep['method'] . ';i')) {

@@ -14,8 +14,12 @@
    */
   function t3tool_ext_handlecmd($args) {
 
+    readConf();
     $cmd = array_shift($args);
     $ext = trim(strtolower($args[0]));
+    $filter = strtolower($args[0]);
+    $local = getFlag('l');
+
     $stripped_ext = str_replace('_', '', $ext);
 
     if ($GLOBALS['version_4']) {
@@ -24,7 +28,9 @@
     if ($GLOBALS['version_6']) {
       $exts = $GLOBALS['TYPO3_CONF_VARS']['EXT']['extListArray'];
     }
-
+if (!$exts) {
+  $exts = array();
+}
     $EM_CONF = array();
     // these are the installed extensinos
     foreach ($exts as $_EXTKEY) {
@@ -47,7 +53,10 @@
     }
 
     // now add the extensions that are not installed
-    foreach (array('typo3conf/ext/', 'typo3/ext/', 'typo3/sysext/') as $path) {
+    foreach (array('Local'=>'typo3conf/ext/', 'Global' => 'typo3/ext/', 'System'=>'typo3/sysext/') as $type=>$path) {
+      if (!is_dir($path)) {
+        continue;
+      }
       $dh = opendir($path);
       while ($_EXTKEY = readdir($dh)) {
         if (substr($_EXTKEY, 0, 1) == '.') {
@@ -62,6 +71,7 @@
 
         if (is_file($path . "$_EXTKEY/ext_emconf.php")) {
           include_once($path . "$_EXTKEY/ext_emconf.php");
+          $EM_CONF[$_EXTKEY]['added by t3tool']['type'] = $type;
           $EM_CONF[$_EXTKEY]['added by t3tool']['path'] = $path;
           $EM_CONF[$_EXTKEY]['added by t3tool']['installed'] = FALSE;
         }
@@ -73,7 +83,8 @@
     switch ($cmd) {
 
       case 'list' :
-        foreach ($EM_CONF as $extkey => $config) {
+        foreach ($exts as $extkey) {
+          $config = $EM_CONF[$extkey];
           if (!$ext || preg_match("/$ext/", $extkey) || preg_match("/$ext/", $config['title'])) {
             $extdata = array(
               'key' => $extkey,
@@ -84,7 +95,28 @@
             $extlist[] = $extdata;
           }
         }
-        echo "Installed extensions:\n";
+        if (sizeof($extlist)) {
+          echo "Installed extensions:\n";
+          sendAsFlatTable($extlist);
+        } else {
+          echo "No installed extensions\n";
+        }
+        break;
+
+      case 'available' :
+        foreach ($EM_CONF as $extkey => $config) {
+          if (!$ext || preg_match("/$ext/", $extkey) || preg_match("/$ext/", $config['title'])) {
+            $extdata = array(
+              'key' => $extkey,
+              'title' => $config['title'],
+              'version' => $config['version'],
+              'type' => $config['added by t3tool']['type'],
+              'installed' => in_array($extkey, $exts) ? 'installed' : '',
+            );
+            $extlist[] = $extdata;
+          }
+        }
+        echo "Available extensions:\n";
         sendAsFlatTable($extlist);
         break;
 
@@ -99,22 +131,76 @@
 
         break;
 
-      case 'disable':
-        unset($EM_CONF[$ext]);
+
+      case 'install' :
+      case 'enable' :
+        if (!isset($EM_CONF[$ext])) {
+          die ("Extension not present\n");
+        }
+        if (in_array($ext, $exts)) {
+          die ("Extension already installed\n");
+        }
+
+        echo "Installing $ext... ";
+
         if ($GLOBALS['version_4']) {
-          print '$GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extList"] = ' . implode(',', array_keys($EM_CONF));
+          if ($local) {
+            appendToPHPFile(getConfFilename($local), '$GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extList"] .= ",' . $ext . '"');
+          } else {
+            setLocalConf('EXT.extList', $GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extList"] . ',' . $ext . ';', $local);
+          }
+        } else {
+          if ($local) {
+            appendToPHPFile(getConfFilename($local), '$GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extListArray"][] = "' . $ext . '";');
+          } else {
+            if (!in_array($ext, $GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extListArray"])) {
+              $GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extListArray"][] = $ext;
+            }
+            if (!isset($GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extConf"][$ext])) {
+              $GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extConf"][$ext] = serialize(array());
+            }
+            setLocalConf('EXT.extListArray', $GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extListArray"], $local);
+          }
         }
-        if ($GLOBALS['version_6']) {
-          print '$GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extListArray"] = ' . var_export(array_keys($EM_CONF), 1) . ';';
+
+
+        echo "ok.\n";
+        t3tool_cc_config();
+        break;
+
+      case
+      'uninstall' :
+      case 'disable':
+        if (!in_array($ext, $exts)) {
+          die ("Extension not installed\n");
         }
+        echo "Uninstalling $ext... ";
+
+        if (getFlag('l')) {
+
+          // this is a relative model
+          if ($GLOBALS['version_4']) {
+            writeToConfFile('$GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extList"] = preg_replace(";(^|,)' . $ext . '($|,);", ",", $GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extList"]);');
+          }
+          if ($GLOBALS['version_6']) {
+            writeToConfFile('$i = array_search("' . $ext . '", $GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extListArray"]); if ($i) {
+            unset($GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extListArray"][$i]);
+          }');
+          }
+        } else {
+
+        }
+        echo "ok.\n";
+        t3tool_cc_config();
         break;
 
       case 'config' :
         if (!trim($ext)) {
           die("Usage : t3tool ext config <extkey>.\n");
         }
-        print_R(unserialize($TYPO3_CONF_VARS['EXT']['extConf'][$ext]));
+        print_R(unserialize($GLOBALS['TYPO3_CONF_VARS']['EXT']['extConf'][$ext]));
         break;
+
 
       case 'dependencies' :
         foreach ($EM_CONF as $_EXTKEY => $config) {
@@ -133,12 +219,13 @@
               $dependencies = $EM_CONF[$_EXTKEY]['dependencies'];
               foreach (explode(',', $dependencies) as $dependee) {
                 $by_depender[$_EXTKEY . ' ' . $depender_version][$dependee] = TRUE;
-                $by_dependee[$dependee][$version][$_EXTKEY] = TRUE;
+                $by_dependee[$dependee][$version][$_EXTKEY . '(' . $EM_CONF[$_EXTKEY]['version'] . ')'] = TRUE;
               }
             }
           }
         }
 
+        ksort($by_depender);
         ksort($by_dependee);
         echo "Dependencies by depender:\n";
         foreach ($by_depender as $depender => $dependees) {
@@ -182,7 +269,7 @@
             if (isset($EM_CONF[$_EXTKEY]['conflicts'])) {
               foreach (explode(',', $EM_CONF[$_EXTKEY]['conflicts']) as $dependee) {
                 $by_depender[$_EXTKEY . ' ' . $depender_version][$dependee] = TRUE;
-                $by_dependee[$dependee][$version][$_EXTKEY] = TRUE;
+                $by_dependee[$dependee][$version][$_EXTKEY . '(' . $EM_CONF[$_EXTKEY]['version'] . ')'] = TRUE;
               }
             }
           }
@@ -217,8 +304,6 @@
 
 
       case 'report' :
-$filter = strtolower($args[0]);
-
         $projects = array();
 
         foreach ($EM_CONF as $extKey => $info) {
@@ -232,8 +317,9 @@ $filter = strtolower($args[0]);
 
           );
 
-          if (in_array($filter, array('local', 'system', 'global')) && $filter!=strtolower($project['type']))
+          if (in_array($filter, array('local', 'system', 'global')) && $filter != strtolower($project['type'])) {
             continue;
+          }
 
           if ($project['type'] != 'Local' || isInTer($extKey)) {
             $secureVersion = getSecureVersion($extKey, $info['version']);
@@ -259,7 +345,7 @@ $filter = strtolower($args[0]);
           $siteUpdate |= $projectUpdate;
           $siteSecurity |= $projectSecurity;
 
-            $projects[] = $project;
+          $projects[] = $project;
 
         }
 
@@ -271,8 +357,8 @@ $filter = strtolower($args[0]);
       default :
         die('Usage :
   t3tool ext list
-  t3tool show <ext>
-  t3tool ext config <extkey>
+            t3tool show < ext>
+  t3tool ext config < extkey>
   t3tool ext dependencies
 
 ');
@@ -280,7 +366,7 @@ $filter = strtolower($args[0]);
   }
 
 
-  function isInTer ($extKey) {
+  function isInTer($extKey) {
     global $TYPO3_DB;
     $intVer = convertVersionNumberToInteger($curVersion);
     $res = sql_query('SELECT * FROM cache_extensions WHERE extkey = "' . $extKey . '"');
@@ -321,7 +407,7 @@ $filter = strtolower($args[0]);
    * @return int
    */
   function convertVersionNumberToInteger($versionNumber) {
-    $versionParts = explode('.', $versionNumber);
+    $versionParts = explode(' . ', $versionNumber);
 
     return intval(((int)$versionParts[0] . str_pad((int)$versionParts[1], 3, '0', STR_PAD_LEFT)) . str_pad((int)$versionParts[2], 3, '0', STR_PAD_LEFT));
   }

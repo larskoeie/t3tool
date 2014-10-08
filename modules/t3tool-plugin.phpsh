@@ -53,15 +53,18 @@ function t3tool_plugin_handlecmd($args) {
     // Not quite done.
     //
     case 'stat' :
-      $sql = "select list_type, count(*), hidden, header as title
+      $sql = "
+        select list_type, count(*), tt_content.hidden, tt_content.header as title, pages.title as pageTitle
         from tt_content
-        where CType='list' " . getDeleteClause('tt_content');
+        left join pages on pages.uid=tt_content.pid
+        where CType='list' " . getDeleteClause('tt_content') . getDeleteClause('pages');
 
       if ($ext) {
         $sql .= " and list_type like '$ext%'";
       }
 
-      $sql .= ' group by concat(list_type, hidden)';
+      $sql .= ' group by concat(list_type, tt_content.hidden)';
+      $sql .= ' order by list_type';
 
       $plugins = sql_get_rows($sql);
 
