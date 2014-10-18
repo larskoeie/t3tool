@@ -29,6 +29,39 @@
 
   readConf();
 
+  /**
+   * @param $prompt
+   */
+  function readPassword() {
+    $pw1 = readline('Enter password : ', TRUE);
+    $pw2 = readline('Enter password again : ', TRUE);
+    if ($pw1 == $pw2) {
+      return $pw1;
+    }
+    echo "Passwords do not match.";
+
+    return FALSE;
+  }
+
+  /**
+   *
+   */
+  if (!function_exists('readline')) {
+    function readline($prompt = '', $pw = FALSE) {
+      echo $prompt;
+      if ($pw) {
+        system('stty -echo');
+      }
+      $s = rtrim(fgets(STDIN), "\n");
+      if ($pw) {
+        system('stty echo');
+        echo "\n";
+      }
+
+      return $s;
+    }
+  }
+
   // part of TCA
   $label = array(
     'pages' => 'title',
@@ -64,7 +97,7 @@
   array_shift($args);
   $module = array_shift($args);
 
-  $modules = array('alldomains', 'allusers', 'cc', 'config', 'data', 'deprecation', 'domain', 'ext', 'feuser', 'log', 'page', 'plugin', 'search', 'show', 'sqlq', 'user', 'task', 'template');
+  $modules = array('alladdresses', 'alldomains', 'allusers', 'cc', 'config', 'data', 'deprecation', 'domain', 'ext', 'feuser', 'log', 'page', 'plugin', 'registry', 'search', 'show', 'sqlq', 'user', 'task', 'template');
   $aliases = array();
   foreach ($modules as $m) {
     require_once("modules/t3tool-$m.phpsh");
@@ -172,24 +205,18 @@
 
   }
 
-  /**
-   * @param string $prompt
-   *
-   * @return string
-   */
-  if (!function_exists('readline')) {
-    function readline($prompt = '') {
-      echo $prompt;
-
-      return rtrim(fgets(STDIN), "\n");
-    }
-  }
 
   function readConf() {
     global $TYPO3_CONF_VARS;
 
     if ($GLOBALS['version_4']) {
       require('typo3conf/localconf.php');
+      $GLOBALS['TYPO3_CONF_VARS']['DB'] = array(
+        'host' => $typo_db_host,
+        'username' => $typo_db_username,
+        'password' => $typo_db_password,
+        'database' => $typo_db,
+      );
     }
     if ($GLOBALS['version_6']) {
       $TYPO3_CONF_VARS = include(PATH_typo3conf . 'LocalConfiguration.php');
@@ -224,7 +251,7 @@
     $typo_db = $db['database'];
 
     if (!$typo_db) {
-      die("Error: t3tool requires a functional TYPO3 installation. Apparently you have no DB credentials. Are you in PATH_site ?\n\n");
+      die("Error: Can't connect to DB. Halting.\n\n");
     }
 
     # connect to db
@@ -551,7 +578,6 @@
       foreach ($fields as $field) {
         $or .= " or $table.$field like '$q'";
       }
-
       $where = "and ($or)" . getDeleteClause($table);
     }
 
@@ -853,13 +879,14 @@
 
   }
 
-  function getConfFilename ($local) {
+  function getConfFilename($local) {
     $filename = 'typo3conf/';
     if ($GLOBALS['version_4']) {
       $filename .= $local ? 'localconf_local.php' : 'localconf.php';
     } else {
       $filename .= $local ? 'AdditionalConfiguration.php' : 'LocalConfiguration.php';
     }
+
     return $filename;
   }
 
@@ -882,7 +909,6 @@
   }
 
 
-
   function appendToPHPFile($filename, $s) {
     $data = "";
     if (file_exists($filename)) {
@@ -903,7 +929,9 @@
    * @param $data
    */
   function writeData() {
-    file_put_contents(PATH_site . '.t3tool_data.php', '<?php $GLOBALS["t3tool_data"] = ' . var_export($GLOBALS['t3tool_data'], 1) . ';');
+    if (FALSE) {
+      file_put_contents(PATH_site . '.t3tool_data.php', '<?php $GLOBALS["t3tool_data"] = ' . var_export($GLOBALS['t3tool_data'], 1) . ';');
+    }
   }
 
   /**

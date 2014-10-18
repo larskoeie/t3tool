@@ -1,34 +1,41 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: Lars
- * Date: 29-09-14
- * Time: 20:21
- */
+  /**
+   * Created by PhpStorm.
+   * User: Lars
+   * Date: 29-09-14
+   * Time: 20:21
+   */
 
-function t3tool_config_handlecmd ($args) {
+  function t3tool_config_handlecmd($args) {
 
-  $cmd = strtolower(array_shift($args));
-  $key = trim(($args[0]));
-  $local = getFlag('l');
+    $cmd = strtolower(array_shift($args));
+    $key = trim(($args[0]));
+    $local = getFlag('l');
 
-  switch ($cmd) {
-    case 'get' :
-      print_r(getLocalConf($key));
-     echo "\n";
-      break;
+    switch ($cmd) {
+      case 'get' :
+        print_r(getLocalConf($key));
+        echo "\n";
+        break;
 
-    case 'set' :
-    case 'change' :
-    case 'add' :
-      $value = $args[1];
-      if (!strlen(trim($value))) {
-        die ("Usage: t3tool config set path value\n");
-      }
-      setLocalConf($key, $value, $local);
-      break;
+      // set if exists
+      case 'change' :
+        break;
 
-    default :
-      die("Usage: t3tool config get\n");
+      // set if NOT exists
+      case 'add' :
+        break;
+
+      // just set
+      case 'set' :
+        $value = $args[1];
+        if (!strlen(trim($value))) {
+          die ("Usage: t3tool config set path value\n");
+        }
+        setLocalConf($key, $value, $local);
+        break;
+
+      default :
+        die("Usage: t3tool config get\n");
+    }
   }
-}

@@ -1,0 +1,40 @@
+<?php
+  /**
+   * t3tool-alladdresses.phpsh
+   *
+   * Handles the commands "t3tool alladdresses ...".
+   *
+   * @package t3tool
+   * @author Lars Køie
+   *
+   */
+
+  function t3tool_alladdresses_handlecmd($args) {
+
+    $cmd = array_shift($args);
+    if ($args[0] == 'except') {
+      $username = trim(strtolower($args[1]));
+      $where = "";
+    }
+
+    switch ($cmd) {
+
+      //
+      // Remove email from all users.
+      //
+      case 'disableemail' :
+      case 'removeemail' :
+        $records  = getRecordsByString('tt_address');
+        echo "Removing email from " . sizeof($records) . " records... ";
+        sql_query("update tt_address set email='' where 1 " . $where);
+        echo "done.\n";
+        break;
+
+      default :
+        die ("Usage :
+    t3tool alladdresses removeemail
+      Remove all address emails.
+  ");
+    }
+
+  }

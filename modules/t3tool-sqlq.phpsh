@@ -17,15 +17,12 @@ function t3tool_sqlq_handlecmd($args) {
   $sql = $args[0];
 
   if (!trim($sql)) {
-    die("Usage:
-      t3tool sqlq <sql query>
-        Will run an sql query on TYPO3 database and output the result if any.
-      ");
+    die("Usage:\n  t3tool sqlq <sql query>\n    Will run an sql query on TYPO3 database and output the result if any.\n");
   }
 
   $result = sql_get_rows($sql);
   if ($result == FALSE) {
-    die("Error\n");
+    die("No rows.\n");
   }
 
   sendAsFlatTable($result);

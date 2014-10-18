@@ -1,0 +1,93 @@
+<?php
+  /**
+   * t3tool-user.phpsh
+   *
+   * Handling of backend users and backend user groups.
+   *
+   * @package t3tool
+   * @author Lars Køie
+   *
+   */
+
+  /**
+   * @param $args
+   */
+  function t3tool_registry_handlecmd($args) {
+    $cmd = strtolower(array_shift($args));
+    $key = trim(strtolower($args[0]));
+    $parts = explode('/', $key);
+    if (sizeof($parts) > 1) {
+      $namespace = $parts[0];
+      $key = $parts[1];
+    }
+
+    switch ($cmd) {
+      case 'list' :
+        $sql = "select * from sys_registry where entry_key like '%$key%'";
+        if ($namespace) {
+          $sql .= " and entry_namespace='$namespace'";
+        }
+        $records = getRecordsByString('sys_registry', $key, array('entry_namespace', 'entry_key'));
+        if (!$records) {
+          die();
+        }
+        sendAsFlatTable($records);
+
+        break;
+
+      case 'get' :
+        if (!$key) {
+          die("Usage:\n  t3tool registry get <key>\n  t3tool registry get <namespace/key>\n");
+        }
+        $sql = "select entry_value from sys_registry where entry_key like '%$key%'";
+        if ($namespace) {
+          $sql .= " and entry_namespace='$namespace'";
+        }
+        $record = sql_get_row($sql);
+        if (!$record) {
+          die();
+        }
+        $value = unserialize($record['entry_value']);
+        print_r($value);
+        break;
+
+      case 'set' :
+        $value = $args[1];
+        if (!$key) {
+          die("Usage:\n  t3tool registry set <namespace/key> <value>\n");
+        }
+        if (! $namespace) {
+          die('');
+        }
+        if (!$value) {
+          die();
+        }
+        // check for existence
+        $sql = "select entry_value from sys_registry where entry_key like '%$key%' and entry_namespace='$namespace'";
+
+        $record = sql_get_row($sql);
+        if (!$record) {
+          die();
+        }
+        $value = serialize($value);
+        $sql = "update sys_registry set entry_value='$value' where entry_key like '%$key%' and entry_namespace='$namespace'";
+
+        print_r($sql);
+        break;
+
+
+      default :
+        die("Usage:\n  t3tool registry get\n");
+    }
+
+  }
+
+  /**
+   * @return array
+   */
+  function t3tool_registry_cmdaliases() {
+    return array(
+      'rget' => 'registry get',
+      'vget' => 'registry get',
+    );
+  }

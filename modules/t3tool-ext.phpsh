@@ -28,9 +28,18 @@
     if ($GLOBALS['version_6']) {
       $exts = $GLOBALS['TYPO3_CONF_VARS']['EXT']['extListArray'];
     }
-if (!$exts) {
-  $exts = array();
-}
+    if (file_exists(PATH_typo3conf . 'PackageStates.php')) {
+      $exts = array();
+      $packageStates = include(PATH_typo3conf . 'PackageStates.php');
+      foreach ($packageStates['packages'] as $k => $v) {
+        if ($v['state'] == 'active') {
+          $exts[] = $k;
+        }
+      }
+    }
+    if (!$exts) {
+      $exts = array();
+    }
     $EM_CONF = array();
     // these are the installed extensinos
     foreach ($exts as $_EXTKEY) {
@@ -53,7 +62,7 @@ if (!$exts) {
     }
 
     // now add the extensions that are not installed
-    foreach (array('Local'=>'typo3conf/ext/', 'Global' => 'typo3/ext/', 'System'=>'typo3/sysext/') as $type=>$path) {
+    foreach (array('Local' => 'typo3conf/ext/', 'Global' => 'typo3/ext/', 'System' => 'typo3/sysext/') as $type => $path) {
       if (!is_dir($path)) {
         continue;
       }
@@ -82,7 +91,11 @@ if (!$exts) {
 
     switch ($cmd) {
 
+      //
+      // List of installed extensions
+      //
       case 'list' :
+      case 'installed' :
         foreach ($exts as $extkey) {
           $config = $EM_CONF[$extkey];
           if (!$ext || preg_match("/$ext/", $extkey) || preg_match("/$ext/", $config['title'])) {
@@ -103,6 +116,35 @@ if (!$exts) {
         }
         break;
 
+      //
+      // List of not installed extensions
+      //
+      case 'notinstalled' :
+        foreach ($EM_CONF as $extkey => $config) {
+          if (in_array($extkey, $exts)) {
+            continue;
+          }
+          if (!$ext || preg_match("/$ext/", $extkey) || preg_match("/$ext/", $config['title'])) {
+            $extdata = array(
+              'key' => $extkey,
+              'title' => $config['title'],
+              'version' => $config['version'],
+              'type' => $config['added by t3tool']['type'],
+            );
+            $extlist[] = $extdata;
+          }
+        }
+        if (sizeof($extlist)) {
+          echo "Extensions present, but not installed:\n";
+          sendAsFlatTable($extlist);
+        } else {
+          echo "No not-installed extensions\n";
+        }
+        break;
+
+      //
+      //
+      //
       case 'available' :
         foreach ($EM_CONF as $extkey => $config) {
           if (!$ext || preg_match("/$ext/", $extkey) || preg_match("/$ext/", $config['title'])) {
@@ -168,8 +210,7 @@ if (!$exts) {
         t3tool_cc_config();
         break;
 
-      case
-      'uninstall' :
+      case 'uninstall' :
       case 'disable':
         if (!in_array($ext, $exts)) {
           die ("Extension not installed\n");

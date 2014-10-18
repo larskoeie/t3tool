@@ -1,237 +1,277 @@
 <?php
-/**
- * t3tool-user.phpsh
- *
- * Handling of backend users and backend user groups.
- *
- * @package t3tool
- * @author Lars Køie
- *
- */
+  /**
+   * t3tool-user.phpsh
+   *
+   * Handling of backend users and backend user groups.
+   *
+   * @package t3tool
+   * @author Lars Køie
+   *
+   */
 
-/**
- * @param $args
- */
-function t3tool_user_handlecmd($args) {
-  $cmd = strtolower(array_shift($args));
-  $username = trim(strtolower($args[0]));
+  /**
+   * @param $args
+   */
+  function t3tool_user_handlecmd($args) {
+    $cmd = strtolower(array_shift($args));
+    $username = trim(strtolower($args[0]));
 
-  switch ($cmd) {
+    switch ($cmd) {
 
-    //
-    // Create admin user
-    //
-    case 'create' :
-      $password = trim($args[1]);
-      if (!$username) {
-        die("Usage: t3tool user create <username> [<password>]\n");
-      }
-      if (!$password) {
-        $password = readline("Enter password for new user $username : ");
-      }
-      sql_query("insert into be_users (username, password, admin) values ('$username', md5('$password'), 1)");
+      //
+      // Create admin user
+      //
+      case 'create' :
+        $password = trim($args[1]);
+        if (!$username) {
+          die("Usage:\n  t3tool user create <username> [<password>]\n  Password will be prompted if not supplied.\n");
+        }
+        $existing = sql_get_row("select uid from be_users where username like '$username'");
+        if ($existing) {
+          die("User '$username' already exists. Use 't3tool user password' for changing password.\n");
+        }
+        if (!$password) {
+          $password = readPassword();
+        }
+        if (!$password) {
+          die("Abort.\n");
+        }
+        sql_query("insert into be_users (username, password, admin) values ('$username', md5('$password'), 1)");
 
-      break;
+        break;
 
-    //
-    // Set user's password.
-    //
-    case 'password' :
-      $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
-      $password = trim($args[1]);
-      if (!$password) {
-        $password = readline("Enter new password for user $username : ");
-      }
-      if (!$password) {
-        die("Usage: t3tool user password <username> [<password>]\n");
-      }
-      $GLOBALS['t3tool_data']['stored_passwords'][$user['uid']][time()] = $user['password'];
-      writeData();
-      sql_query("update be_users set password=md5('$password') where uid=" . $user['uid']);
-      break;
+      //
+      // Set user's password.
+      //
+      case 'password' :
+        $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
+        $username = $user['username'];
+        if (!$username) {
+          die("Usage:\n  t3tool user password <username> [<password>]\n  Password will be prompted if not supplied.\n");
+        }
+        $password = trim($args[1]);
+        if (!$password) {
+          $password = readPassword();
+        }
+        if (!$password) {
+          die("Aborting.\n");
+        }
+        $GLOBALS['t3tool_data']['stored_passwords'][$user['uid']][time()] = $user['password'];
+        writeData();
+        sql_query("update be_users set password=md5('$password') where uid=" . $user['uid']);
+        echo "Password changed for user $username.\n";
+        break;
 
-    //
-    // Retrieve
-    // TODO : finish this or remove it
-    case 'passwordrevert' :
-      $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
-      if (! is_array($GLOBALS['t3tool_data']['stored_passwords'][$user['uid']])) {
-        die("No stored passwords for user\n");
-      }
+      //
+      // Retrieve
+      // TODO : finish this or remove it
+      case 'passwordrevert' :
+        $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
+        if (!is_array($GLOBALS['t3tool_data']['stored_passwords'][$user['uid']])) {
+          die("No stored passwords for user\n");
+        }
 
-      $index = $args[1];
-      if (!trim($index)) {
-        die("Usage\n");
+        $index = $args[1];
+        if (!trim($index)) {
+          die("Usage\n");
 
-      }
+        }
 
-      break;
-    //
-    // List user groups
-    //
-    case 'groups' :
-      $groups = getRecordsByString('be_groups', $username, array('title'));
+        break;
+      //
+      // List user groups
+      //
+      case 'groups' :
+        $groups = getRecordsByString('be_groups', $username, array('title'));
 
-      if (!$groups) {
-        die("No matching groups.\n");
-      }
+        if (!$groups) {
+          die("No matching groups.\n");
+        }
 
-      $where = getWhereByString('be_groups', $username, array('title'));
-      $groups = sql_get_rows("select uid, title from be_groups where 1 " . $where);
+        $where = getWhereByString('be_groups', $username, array('title'));
+        $groups = sql_get_rows("select uid, title from be_groups where 1 " . $where);
 
-      sendAsFlatTable($groups);
+        sendAsFlatTable($groups);
 
-      break;
+        break;
 
-    //
-    // Find a user group and show all fields
-    //
-    case 'showgroup' :
-      $group = getSingleRecordByString('be_groups', $args[0], array('title'));
-      sendRecordAsTable($group);
-      break;
+      //
+      // Find a user group and show all fields
+      //
+      case 'showgroup' :
+        $group = getSingleRecordByString('be_groups', $args[0], array('title'));
+        sendRecordAsTable($group);
+        break;
 
-    //
-    // Find members of a user group
-    //
-    case 'members' :
-      $group = getSingleRecordByString('be_groups', $args[0], array('title'));
-      $users = sql_get_rows('select uid, disable, username, email
+      //
+      // Find members of a user group
+      //
+      case 'members' :
+        $group = getSingleRecordByString('be_groups', $args[0], array('title'));
+        $users = sql_get_rows('select uid, disable, username, email
       from be_users
       where find_in_set(' . $group['uid'] . ', usergroup)');
-      sendAsFlatTable($users);
-      break;
+        sendAsFlatTable($users);
+        break;
 
-    //
-    // Add a group to a user
-    //
-    case 'addgroup' :
-      $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
-      $group = getSingleRecordByString('be_groups', $args[1], array('title'));
-      $groups = array();
-      if (trim($user['usergroup'])) {
-        $groups = explode(',', trim($user['usergroup']));
-      }
-      if (!in_array($group['uid'], $groups)) {
-        $groups[] = $group['uid'];
-      }
-      sql_query('update be_users set usergroup="' . implode(',', $groups) . '" where uid = ' . $user['uid']);
-      break;
+      //
+      // Add a group to a user
+      //
+      case 'addgroup' :
+        $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
+        $group = getSingleRecordByString('be_groups', $args[1], array('title'));
+        $groups = array();
+        if (trim($user['usergroup'])) {
+          $groups = explode(',', trim($user['usergroup']));
+        }
+        if (!in_array($group['uid'], $groups)) {
+          $groups[] = $group['uid'];
+        }
+        sql_query('update be_users set usergroup="' . implode(',', $groups) . '" where uid = ' . $user['uid']);
+        break;
 
-    //
-    // Remove a group from a user
-    //
-    case 'rmgroup' :
-      $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
-      $group = getSingleRecordByString('be_groups', $args[1], array('title'));
-      $groups = array_fill_keys(explode(',', trim($user['usergroup'])), TRUE);
-      unset($groups[$group['uid']]);
+      //
+      // Remove a group from a user
+      //
+      case 'rmgroup' :
+        $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
+        $group = getSingleRecordByString('be_groups', $args[1], array('title'));
+        $groups = array_fill_keys(explode(',', trim($user['usergroup'])), TRUE);
+        unset($groups[$group['uid']]);
 
-      sql_query('update be_users set usergroup="' . implode(',', array_keys($groups)) . '" where uid = ' . $user['uid']);
-      break;
+        sql_query('update be_users set usergroup="' . implode(',', array_keys($groups)) . '" where uid = ' . $user['uid']);
+        break;
 
-    //
-    // Make a user admin
-    //
-    case 'setadmin' :
-      $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
-      sql_query('update be_users set admin=1 where uid = ' . $user['uid']);
-      break;
+      //
+      // Make a user admin
+      //
+      case 'setadmin' :
+        $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
+        sql_query('update be_users set admin=1 where uid = ' . $user['uid']);
+        break;
 
-    //
-    // Make a user non-admin
-    //
-    case 'clradmin' :
-      $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
-      echo "Removing admin role from " . $user['username'] . "... ";
-      sql_query('update be_users set admin=0     where uid = ' . $user['uid']);
-      echo "done.";
-      break;
+      //
+      // Make a user non-admin
+      //
+      case 'clradmin' :
+        $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
+        echo "Removing admin role from " . $user['username'] . "... ";
+        sql_query('update be_users set admin=0     where uid = ' . $user['uid']);
+        echo "done.";
+        break;
 
-    //
-    // List users
-    //
-    case 'list' :
-      $users = getRecordsByString('be_users', $username, array('username', 'email'));
+      //
+      // List users
+      //
+      case 'list' :
+        $users = getRecordsByString('be_users', $username, array('username', 'email'));
 
-      if (!$users) {
-        die("No matching users.\n");
-      }
+        if (!$users) {
+          die("No matching users.\n");
+        }
 
-      $where = getWhereByString('be_users', $username, array('username', 'email'));
-      $users = sql_get_rows("select uid, username, email, disable from be_users where 1 " . $where);
+        $where = getWhereByString('be_users', $username, array('username', 'email'));
+        $users = sql_get_rows("select uid, username, email, disable from be_users where 1 " . $where);
 
-      sendAsFlatTable($users);
-      break;
+        sendAsFlatTable($users);
+        break;
 
-    //
-    // Search for user(s) and show all fields.
-    //
-    case 'show' :
-      if (!trim($username)) {
-        die("Usage : t3tool user show <username, email or uid>. Case insensitive.\n");
-      }
-      $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
-      if (trim($user['uc'])) {
-        $user['uc'] = unserialize($user['uc']);
-      }
+      //
+      // Search for user(s) and show all fields.
+      //
+      case 'show' :
+        if (!trim($username)) {
+          die("Usage : t3tool user show <username, email or uid>. Case insensitive.\n");
+        }
+        $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
+        if (trim($user['uc'])) {
+          $user['uc'] = unserialize($user['uc']);
+        }
 
-      sendRecordAsTable($user);
-      break;
+        sendRecordAsTable($user);
+        break;
 
-    //
-    // Enable single user.
-    //
-    case 'enable' :
-      if (!trim($username)) {
-        die("Usage : t3tool user enable <username or uid>. Case insensitive.\n");
-      }
-      $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
+      //
+      // Enable single user.
+      //
+      case 'enable' :
+        if (!trim($username)) {
+          die("Usage : t3tool user enable <username or uid>. Case insensitive.\n");
+        }
+        $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
 
-      if ($user['disable'] == 0) {
-        die($user['username'] . " already enabled.\n");
-      }
+        if ($user['disable'] == 0) {
+          die($user['username'] . " already enabled.\n");
+        }
 
-      echo("Enabling user " . $user['username'] . "... ");
-      sql_query("update be_users set disable=0 where uid= " . $user['uid'] . " limit 1");
-      echo "done.\n";
+        echo("Enabling user " . $user['username'] . "... ");
+        sql_query("update be_users set disable=0 where uid= " . $user['uid'] . " limit 1");
+        echo "done.\n";
 
-      break;
+        break;
 
-    //
-    // Disable single user
-    //
-    case 'disable' :
-      if (!trim($username)) {
-        die("Usage : t3tool user disable <username or uid>. Case insensitive.");
-      }
-      $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
+      //
+      // Disable single user
+      //
+      case 'disable' :
+        if (!trim($username)) {
+          die("Usage : t3tool user disable <username or uid>. Case insensitive.");
+        }
+        $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
 
-      if ($user['disable'] == 1) {
-        die($user['username'] . " already disabled.\n");
-      }
-      echo("Disabling user " . $user['username'] . "... ");
+        if ($user['disable'] == 1) {
+          die($user['username'] . " already disabled.\n");
+        }
+        echo("Disabling user " . $user['username'] . "... ");
 
-      sql_query("update be_users set disable=1 where uid =  " . $user['uid'] . " limit 1");
-      echo "done.\n";
+        sql_query("update be_users set disable=1 where uid =  " . $user['uid'] . " limit 1");
+        echo "done.\n";
 
-      break;
+        break;
 
-    //
-    // Delete single user.
-    //
-    case 'delete' :
-      if (!trim($username)) {
-        die("Usage : t3tool user delete <username or uid>. Case insensitive. NO going back!");
-      }
-      $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
+      //
+      // Delete single user.
+      //
+      case 'delete' :
+        if (!trim($username)) {
+          die("Usage : t3tool user delete <username or uid>. Case insensitive. NO going back!");
+        }
+        $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
 
-      sql_query("delete from be_users where uid =  " . $user['uid'] . " limit 1");
-      echo $user['username'] . " deleted.\n";
-      break;
+        sql_query("delete from be_users where uid =  " . $user['uid'] . " limit 1");
+        echo $user['username'] . " deleted.\n";
+        break;
 
-    default :
-      die("Usage :
+      // --- Below here is stuff related to logged in users (sessions) - should maybe be moved to another module.
+
+      //
+      // List backend users currently logged in.
+      //
+      case 'online' :
+        $users = sql_get_rows('
+        select uid, username, from_unixtime(ses_tstamp) as last_activity, timediff(now(), from_unixtime(ses_tstamp)) as age, ses_id as cookie
+        from be_sessions
+        left join be_users on be_sessions.ses_userid=be_users.uid
+        ');
+        sendAsFlatTable($users);
+
+        break;
+
+      //
+      // Kick backend user off system.
+      //
+      case 'kick' :
+        if (!trim($username)) {
+          die("Usage : t3tool user kick <username or uid>.");
+        }
+        $user = getSingleRecordByString('be_users', $username, array('username', 'email'));
+        sql_query('delete from be_sessions where ses_userid=' . $user['uid']);
+        echo $user['username'] . " is out.\n";
+
+        break;
+
+      default :
+        die("Usage :
   t3tool user list [<username, email or uid>]
     List all users.
   t3tool user show <username, email or uid>
@@ -254,26 +294,30 @@ function t3tool_user_handlecmd($args) {
     Add group to user.
   t3tool user rmgroup <username, email or uid> <group uid or title>
     Remove group from user.
-  t3tool user password <username, email or uid>
-    Set users password (passwrord will be prompted).
+  t3tool user password <username, email or uid> [<password>]
+    Set users password (password will be prompted if not supplied).
   t3tool user create <username, email or uid>
-    Create admin user (password will be prompted).
+    Create admin user (password will be prompted if not supplied).
 
+  t3tool user online
+    List logged in users.
+  t3tool user kick <username or uid>
+    Kick user off system.
     ");
 
+    }
   }
-}
 
-function t3tool_user_cmdaliases() {
-  return array(
-    'ublk' => 'user disable',
-    'ucan' => 'user delete',
-    'ucrt' => 'user create',
-    'uinf' => 'user show',
-    'upwd' => 'user password',
-    'urol' => 'user addgroup',
-    'urrol' => 'user rmgroup',
-    'uublk' => 'user enable',
-  );
+  function t3tool_user_cmdaliases() {
+    return array(
+      'ublk' => 'user disable',
+      'ucan' => 'user delete',
+      'ucrt' => 'user create',
+      'uinf' => 'user show',
+      'upwd' => 'user password',
+      'urol' => 'user addgroup',
+      'urrol' => 'user rmgroup',
+      'uublk' => 'user enable',
+    );
 
-}
+  }
