@@ -92,12 +92,36 @@
       $args[] = $arg;
     }
   }
-  var_dump($GLOBALS['flags']);
+  if (sizeof($GLOBALS['flags'])) {
+    echo "Flags: " . print_r($GLOBALS['flags']);
+  }
 
   array_shift($args);
   $module = array_shift($args);
 
-  $modules = array('alladdresses', 'alldomains', 'allusers', 'cc', 'config', 'data', 'deprecation', 'domain', 'ext', 'feuser', 'log', 'page', 'plugin', 'registry', 'search', 'show', 'sqlq', 'user', 'task', 'template');
+  $modules = array(
+    'alladdresses',
+    'alldomains',
+    'allfeusers',
+    'allusers',
+    'cc',
+    'config',
+    'data',
+    'deprecation',
+    'domain',
+    'ext',
+    'feuser',
+    'log',
+    'page',
+    'plugin',
+    'registry',
+    'search',
+    'show',
+    'sqlq',
+    'user',
+    'task',
+    'template'
+  );
   $aliases = array();
   foreach ($modules as $m) {
     require_once("modules/t3tool-$m.phpsh");
@@ -533,7 +557,12 @@
     }
 
     // these tables have field deleted
-    if (in_array($table, array('pages', 'sys_template', 'tt_content'))) {
+    if (in_array($table, array(
+      'pages',
+      'sys_template',
+      'tt_content'
+    ))
+    ) {
       // all others have
       return " and not $alias.deleted";
     }
