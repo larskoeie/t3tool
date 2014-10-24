@@ -1,0 +1,57 @@
+<?php
+  /**
+   * t3tool-user.phpsh
+   *
+   * Handling of backend users and backend user groups.
+   *
+   * @package t3tool
+   * @author Lars Køie
+   *
+   */
+
+  /**
+   * @param $args
+   */
+  function t3tool_history_handlecmd($args) {
+    $cmd = strtolower(array_shift($args));
+    $q = trim(strtolower($args[0]));
+
+    switch ($cmd) {
+      //
+      // List
+      //
+      case 'list' :
+        $items = sql_get_rows("
+        select sys_history.uid, sys_history.tstamp, be_users.username, sys_history.tablename, sys_history.recuid, sys_history.fieldlist
+        from sys_history
+        left join sys_log on sys_log.uid=sys_history.sys_log_uid
+        left join be_users on be_users.uid=sys_log.userid
+        order by sys_history.uid desc
+        limit 20");
+
+        if (!$items) {
+          die("No matching items.\n");
+        }
+
+        foreach ($items as $i=>$item) {
+
+          $items[$i]['tstamp'] = strftime('%d.%m.%Y %H.%M', $item['tstamp']);
+        }
+        sendAsFlatTable($items);
+        break;
+
+
+      default :
+        die("Usage :
+  t3tool history list
+    List last history events.
+    ");
+
+    }
+  }
+
+  function t3tool_history_cmdaliases() {
+    return array(
+    );
+
+  }

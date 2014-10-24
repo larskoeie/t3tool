@@ -19,7 +19,7 @@
     switch ($cmd) {
       case 'list' :
       case 'find' :
-        $feusers = getRecordsByString('fe_users', $username, array('username'), 'uid, pid, username, disable');
+        $feusers = getRecordsByString('fe_users', $username, array('username'), 'uid, pid, username, email, disable');
         if ($cmd == 'list') {
           sendAsFlatTable($feusers);
         }
@@ -36,7 +36,7 @@
         $pid = intval($args[2]);
 
         if (!$password) {
-          $password = readline("Enter password for new frontend user $username : ");
+          $password = readPassword("Enter password for new frontend user $username : ");
         }
         if (!$password) {
           die("Usage: t3tool feuser create <pid> <username> [<password>]\n");

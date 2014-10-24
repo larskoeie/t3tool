@@ -24,6 +24,11 @@ function t3tool_sqlq_handlecmd($args) {
   if ($result == FALSE) {
     die("No rows.\n");
   }
+  if ($result === TRUE) {
+    $updated = sql_affected_rows();
+    die('OK - ' . $updated . " affected rows.\n");
+
+  }
 
   sendAsFlatTable($result);
 

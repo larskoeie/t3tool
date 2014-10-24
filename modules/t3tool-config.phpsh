@@ -12,6 +12,8 @@
     $key = trim(($args[0]));
     $local = getFlag('l');
 
+    $exists = getLocalConf($key) != NULL;
+
     switch ($cmd) {
       case 'get' :
         print_r(getLocalConf($key));
@@ -20,22 +22,43 @@
 
       // set if exists
       case 'change' :
-        break;
 
       // set if NOT exists
       case 'add' :
-        break;
 
       // just set
       case 'set' :
+        if ($cmd == 'add' && $exists) {
+          die("Already exists. Use 'set' or 'change'.\n");
+        }
+        if ($cmd == 'change' && !$exists) {
+          die("Does not exist. Use 'set' or 'add'.\n");
+        }
         $value = $args[1];
         if (!strlen(trim($value))) {
-          die ("Usage: t3tool config set path value\n");
+          die ("Usage:
+          t3tool config add path value
+            Will set value if it does not exist.
+          t3tool config change path value
+            Will change value if it exists already.
+          t3tool config set path value
+            Will set value.
+          ");
         }
         setLocalConf($key, $value, $local);
+        break;
+
+      case 'eit' :
+        touch(PATH_typo3conf . 'ENABLE_INSTALL_TOOL');
         break;
 
       default :
         die("Usage: t3tool config get\n");
     }
+  }
+
+  function t3tool_config_cmdaliases() {
+    return array(
+      'eit' => 'config eit',
+    );
   }

@@ -454,5 +454,10 @@
   }
 
 
-
+  function t3tool_ext_cmdaliases() {
+    return array(
+      'en' => 'ext enable',
+      'dis' => 'ext disable',
+    );
+  }
 

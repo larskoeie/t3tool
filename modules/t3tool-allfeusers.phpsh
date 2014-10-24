@@ -25,7 +25,7 @@
       case 'enable' :
         $users = getRecordsByString('fe_users');
 
-        echo "Enabling " . sizeof($users) . " users... ";
+        echo "Enabling " . sizeof($users) . " frontend users... ";
         sql_query("update fe_users set disable=0 where 1 " . $where);
         echo "done.\n";
 
@@ -37,7 +37,7 @@
       case 'disable' :
         $users = getRecordsByString('fe_users');
 
-        echo "Disabling " . sizeof($users) . " users... ";
+        echo "Disabling " . sizeof($users) . " frontend users... ";
         sql_query("update fe_users set disable=1 where username not like '\_%' " . $where);
         echo "done.\n";
 
@@ -56,7 +56,7 @@
       case 'disableemail' :
       case 'removeemail' :
         $users = getRecordsByString('fe_users');
-        echo "Removing email from " . sizeof($users) . " users... ";
+        echo "Removing email from " . sizeof($users) . " frontend users... ";
         sql_query("update fe_users set email='removed' where 1 " . $where);
         echo "done.\n";
         break;

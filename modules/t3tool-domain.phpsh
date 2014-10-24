@@ -152,6 +152,21 @@
         break;
 
       //
+      // Move to different page
+      //
+      case 'move' :
+        $pid = $args[1];
+        if (!trim($pid)) {
+          die ("Usage : t3tool domain move <domainName or uid> <to pid>\n");
+        }
+        $page = getSingleRecordByString('pages', $pid);
+        $pid = $page['uid'];
+        $pagetitle = $page['title'];
+
+
+        break;
+
+      //
       // Delete a single domain.
       //
       case 'delete' :

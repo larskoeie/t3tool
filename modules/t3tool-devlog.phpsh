@@ -1,0 +1,54 @@
+<?php
+  /**
+   * t3tool-devlog.phpsh
+   *
+   * Handling of backend users and backend user groups.
+   *
+   * @package t3tool
+   * @author Lars Køie
+   *
+   */
+
+  /**
+   * @param $args
+   */
+  function t3tool_devlog_handlecmd($args) {
+    $cmd = strtolower(array_shift($args));
+    if (!$cmd) {
+      $cmd = 'list';
+    }
+    $q = trim(strtolower($args[0]));
+
+    switch ($cmd) {
+      //
+      // List
+      //
+      case 'list' :
+        $items = getRecordsByString('tx_devlog', $q, array('msg'), 'uid, crdate, msg, data_var', 'crdate desc', 50);
+
+        if (!$items) {
+          die("No matching items.\n");
+        }
+        foreach ($items as $i=>$item) {
+          $items[$i]['crdate'] = strftime('%d.%m.%Y %H.%M', $items[$i]['crdate']);
+        }
+
+        sendAsFlatTable($items);
+        break;
+
+      //
+      // Show
+      //
+      case 'show'  :
+        $record = getSingleRecordByString('tx_devlog', $q, array('msg'), 'msg');
+
+        if (!$record) {
+          die("No matching items.\n");
+        }
+
+        sendRecordAsTable($record);
+        break;
+
+
+    }
+  }

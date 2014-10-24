@@ -84,7 +84,7 @@
   /**
    *
    */
-  function t3tool_cc_content () {
+  function t3tool_cc_content() {
 
   }
 
@@ -93,23 +93,21 @@
    */
   function t3tool_cc_config() {
     echo "Clearing config cache... ";
-    if ($GLOBALS['version_4']) {
-      $files = scandir(PATH_typo3conf);
-      foreach ($files as $file) {
-        if (preg_match('/^temp_CACHED/', $file)) {
-          unlink(PATH_typo3conf . $file);
-        }
+    $files = scandir(PATH_typo3conf);
+    foreach ($files as $file) {
+      if (preg_match('/^temp_CACHED/', $file)) {
+        unlink(PATH_typo3conf . $file);
       }
     }
-    if ($GLOBALS['version_6']) {
-      rmdir_recursive(PATH_site . 'typo3temp/Cache/Code/');
-    }
+
+    rmdir_recursive(PATH_site . 'typo3temp/Cache/Code/');
     echo "done.\n";
   }
 
   function rmdir_recursive($dir) {
-    if (!is_dir($dir))
+    if (!is_dir($dir)) {
       return TRUE;
+    }
     foreach (scandir($dir) as $file) {
       if ('.' === $file || '..' === $file) {
         continue;
@@ -122,3 +120,4 @@
     }
     rmdir($dir);
   }
+

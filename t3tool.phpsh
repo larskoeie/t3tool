@@ -75,9 +75,11 @@
   /**
    * Flags are :
    * - d : include deleted records in lists and searches. Default is "exclude deleted records".
+   * - f : full - do not crop long strings
    * - l : "local configuration" : Changes to configuration are written to the local one, the one in .gitignore (localconf_local or AdditionalConfiguration).
    * - p : "pid" - all operations are filtered to elements on this pid - not implemented yet
    * - r : "recursive" - infinitely - not implemented yet
+   *
    */
   foreach ($argv as $i => $arg) {
     if ($arg{0} == '-') {
@@ -108,9 +110,11 @@
     'config',
     'data',
     'deprecation',
+    'devlog',
     'domain',
     'ext',
     'feuser',
+    'history',
     'log',
     'page',
     'plugin',
@@ -234,7 +238,7 @@
     global $TYPO3_CONF_VARS;
 
     if ($GLOBALS['version_4']) {
-      require('typo3conf/localconf.php');
+      require_once('typo3conf/localconf.php');
       $GLOBALS['TYPO3_CONF_VARS']['DB'] = array(
         'host' => $typo_db_host,
         'username' => $typo_db_username,
@@ -264,7 +268,7 @@
     if ($GLOBALS['DBIsInited']) {
       return TRUE;
     }
-    readConf();
+
     global $TYPO3_CONF_VARS;
     echo "Connecting to database ...";
 
@@ -361,6 +365,9 @@
     $res = sql_query($sql);
     if ($res == FALSE) {
       return FALSE;
+    }
+    if ($res === TRUE) {
+      return TRUE;
     }
     $rows = array();
     while ($row = sql_fetch_assoc($res)) {
@@ -634,7 +641,7 @@
    *
    * @return array|bool
    */
-  function getRecordsByString($table, $q = '', $fields = array(), $selectFields = '*') {
+  function getRecordsByString($table, $q = '', $fields = array(), $selectFields = '*', $orderby = '', $limit = 0) {
     if ($table == 'pages') {
       // handle special "magic" shorthands
       switch ($q) {
@@ -648,7 +655,10 @@
 
     }
 
-    $matches = sql_get_rows("select $selectFields from $table where 1 " . getWhereByString($table, $q, $fields));
+    $matches = sql_get_rows("select $selectFields from $table where 1 " . getWhereByString($table, $q, $fields) .
+      ($orderby ? ' order by ' . $orderby : '') .
+      ($limit ? ' limit ' . $limit : '')
+    );
 
     return $matches;
   }
@@ -715,13 +725,15 @@
       $b[0] = str_pad('', $l[0], '-');
     }
     foreach ($values as $k => $v) {
-      if (is_object($v)) {
+      if (preg_match('/^A|O:[0-9]+:/', $values[$k])) {
+        $values[$k] = unserialize($values[$k]);
+      }
+      if (is_object($values[$k])) {
         $values[$k] = print_r($values[$k], 1);
       } elseif (is_array($v)) {
         $values[$k] = print_r($values[$k], 1);
       } else {
-        $values[$k] = preg_replace(";\n|\r\t;", ' ', $values[$k]);
-        $values[$k] = crop($values[$k]);
+        $values[$k] = objectToString($values[$k]);
       }
       $l[1] = max($l[1], strlen($values[$k]));
       $b[1] = str_pad('', $l[1], '-');
@@ -757,6 +769,24 @@
   }
 
   /**
+   * @param $s
+   */
+  function objectToString ($s) {
+    if (preg_match('/^A|O:[0-9]+:/i', $s)) {
+      $s = unserialize($s);
+    }
+    if (is_object($s)) {
+      $s = print_r($s, 1);
+    } elseif (is_array($s)) {
+      $s = print_r($s, 1);
+    }
+
+    $s = preg_replace(";\n|\r\t;", ' ', $s);
+    $s = crop($s);
+    return $s;
+  }
+
+  /**
    * Formats and outputs an array of records as a table with headers on top.
    *
    * @param array $a
@@ -765,11 +795,15 @@
     $l = array();
     if (!sizeof($a)) {
       echo "No records\n";
-
       return;
     }
     $cols = array_keys($a[0]);
     $footer[$cols[0]] = count($a);
+
+    foreach ($a as $y => $row) {
+      foreach ($row as $x => $d) {
+    $a[$y][$x] = objectToString($a[$y][$x]);
+      }}
     foreach ($a as $y => $row) {
       foreach ($row as $x => $d) {
         $h[$x] = $x;
