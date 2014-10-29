@@ -19,6 +19,7 @@
   error_reporting(E_ALL ^ E_NOTICE ^ E_DEPRECATED);
   //  error_reporting(E_ALL);
 
+  define('PATH_script', dirname(__FILE__) . '/');
   define('PATH_site', getcwd() . '/');
   define('PATH_typo3conf', PATH_site . 'typo3conf/');
   define('PATH_t3lib', PATH_site . 't3lib/');
@@ -28,6 +29,8 @@
   $GLOBALS['version_6'] = is_file(PATH_typo3conf . 'LocalConfiguration.php');
 
   readConf();
+  buildTCA();
+
 
   /**
    * @param $prompt
@@ -98,141 +101,134 @@
     echo "Flags: " . print_r($GLOBALS['flags']);
   }
 
+  // remove arg-0 which is path to script
   array_shift($args);
-  $module = array_shift($args);
 
-  $modules = array(
-    'alladdresses',
-    'alldomains',
-    'allfeusers',
-    'allusers',
-    'cc',
-    'config',
-    'data',
-    'deprecation',
-    'devlog',
-    'domain',
-    'ext',
-    'feuser',
-    'history',
-    'log',
-    'page',
-    'plugin',
-    'registry',
-    'search',
-    'show',
-    'sqlq',
-    'user',
-    'task',
-    'template'
-  );
-  $aliases = array();
-  foreach ($modules as $m) {
-    require_once("modules/t3tool-$m.phpsh");
-    $function = 't3tool_' . $m . '_cmdaliases';
-    if (function_exists($function)) {
-      $aliases = array_merge($aliases, $function());
+  // handle command
+  t3tool_handlecmd($args);
+
+  function t3tool_handlecmd($argv) {
+    $args = $argv;
+    $module = array_shift($argv);
+
+    $modules = array(
+      'alladdresses',
+      'alldomains',
+      'allfeusers',
+      'allusers',
+      'cc',
+      'config',
+      'data',
+      'deprecation',
+      'devlog',
+      'domain',
+      'ext',
+      'feuser',
+      'history',
+      'log',
+      'page',
+      'plugin',
+      'registry',
+      'search',
+      'show',
+      'sqlq',
+      'user',
+      'task',
+      'template'
+    );
+    $aliases = array();
+
+    // aliases defined by modules
+    foreach ($modules as $m) {
+      require_once("modules/t3tool-$m.phpsh");
+      $function = 't3tool_' . $m . '_cmdaliases';
+      if (function_exists($function)) {
+        $aliases = array_merge($aliases, $function());
+      }
     }
-  }
-  if (isset($aliases[$module])) {
-    $args = explode(' ', str_replace($module, $aliases[$module], implode(' ', $argv)));
-    array_shift($args);
-    $module = array_shift($args);
-  }
 
-  if (in_array($module, $modules)) {
-    $function = 't3tool_' . $module . '_handlecmd';
-    if (function_exists($function)) {
-      $function($args);
+    // global aliases
+    $filename = PATH_script . 'includes/aliases.php';
+    if (file_exists($filename)) {
+      $aliases = array_merge($aliases, include($filename));
     }
-    die(); // this is temporary
-  }
 
-  switch ($module) {
+    // aliases defined by user
+    $user = posix_getpwuid(posix_getuid());
+    $filename = $user['dir'] . '/.t3tool/aliases.php';
+    if (file_exists($filename)) {
+      include($filename);
+    }
 
-    #
-    case 'rootline' :
-      $a = array();
-      if (!$argv[2]) {
-        die("Usage : t3tool rootline <uid or page-title>\n  Show the rootline of page\n");
+    if (isset($aliases[$module])) {
+      if (is_array($aliases[$module])) {
+        // run commmands
+        foreach ($aliases[$module]['commands'] as $str) {
+          foreach ($args as $k=>$v) {
+            $str = str_replace('$' . $k, $v, $str);
+          }
+          $child_args = explode(' ', $str);
+          t3tool_handlecmd($child_args);
+        }
+
+      } else {
+        $args = explode(' ', str_replace($module, $aliases[$module], implode(' ', $args)));
+        t3tool_handlecmd($args);
+
+        return;
       }
-      $res = sql_query('select title, uid, pid, deleted, hidden from pages where uid=' . intval($args[0]) . ' or title like "' . $args[0] . '"');
-      while ($row = sql_fetch_array($res)) {
-        $a = getRootline($row['uid']);
-        sendAsFlatTable($a, TRUE);
-      }
-      break;
+    }
 
-    #
-    # t3tool find <table>
-    # t3tool find <table:uid>
-    #
-    case 'find' :
-      $parts = explode(':', $argv[2]);
-
-      $table = 'pages';
-      $field = 'uid';
-      $uid = $parts[0];
-
-      if (sizeof($parts) > 1) {
-        list($table, $uid) = $parts;
-      }
-      if (sizeof($parts) > 2) {
-        list($table, $field, $uid) = $parts;
+    // dispatch command and arguments to module
+    if (in_array($module, $modules)) {
+      $function = 't3tool_' . $module . '_handlecmd';
+      if (function_exists($function)) {
+        $function($argv);
       }
 
-      if (!$uid) {
-        die("Usage:\n  t3tool find <table:uid>\n  t3tool find <table:field:string>\nWill tell you where element is\n");
-      }
-
-      $lab = $label[$table];
-
-      $res = sql_query("select t.$lab as title, t.uid, t.pid, t.deleted, t.hidden from $table as t left join pages as p on (p.uid=t.pid) where t.$field='$uid'");
-      while ($row = mysql_fetch_array($res)) {
-        $row['title'] = $table . ':' . $row['uid'];
-        $a = getRootline($row['pid']);
-        array_push($a, $row);
-        sendAsTable($a, TRUE);
-      }
-      break;
-
-    case 'config' :
-    case 'tca' :
-    case 'ts' :
-      break;
-
-    default :
+      return; // this is temporary
+    } else {
       echo 'Usage :
-  t3tool user
-    Handle a single BE user.
-  t3tool allusers
-    Handle all BE users.
-  t3tool search
-    Do a search in database.
-  t3tool show
-    Select a single record from database.
-  t3tool domain
-    Handle a single domain record.
-  t3tool alldomains
-    Handle all domain records.
-  t3tool template
-    Handle a single template record.
-  t3tool rootline <pid>
-    Show rootline of page.
-  t3tool search <table> <string>
-    Search table for string.
-  t3tool sqlq <query>
-    Execute DB query.
-  t3tool page
-    Handle a single page.
-  t3tool sql
-    Do other sql stuff.
+    t3tool user
+      Handle a single BE user.
+    t3tool allusers
+      Handle all BE users.
+    t3tool search
+      Do a search in database.
+    t3tool show
+      Select a single record from database.
+    t3tool domain
+      Handle a single domain record.
+    t3tool alldomains
+      Handle all domain records.
+    t3tool template
+      Handle a single template record.
+    t3tool rootline <pid>
+      Show rootline of page.
+    t3tool search <table> <string>
+      Search table for string.
+    t3tool sqlq <query>
+      Execute DB query.
+    t3tool page
+      Handle a single page.
+    t3tool sql
+      Do other sql stuff.
 
-';
+  ';
+    }
 
 
   }
 
+
+  function buildTCA() {
+    $tca = include('includes/tca-core-6-1.php');
+    $tca_t3tool = array();
+    if (file_exists('includes/tca-t3tool.php')) {
+      $tca_t3tool = include('includes/tca-t3tool.php');
+    }
+    $GLOBALS['TCA'] = array_replace_recursive($tca, $tca_t3tool);
+  }
 
   function readConf() {
     global $TYPO3_CONF_VARS;
@@ -451,6 +447,20 @@
   }
 
   /**
+   * @param $pid
+   *
+   * @return string something like "TYPO3/Welcome/About..."
+   */
+  function getFormattedRootline ($pid) {
+    $a = array();
+    pa($pid, $a);
+    foreach ($a as $page) {
+      $titles[] = $page['title'];
+    }
+    return implode(' / ', array_reverse($titles));
+  }
+
+  /**
    * Converts an array of records to a tree structure array of records.
    *
    * @param $a
@@ -501,7 +511,7 @@
    * @return bool
    */
   function pa($uid, &$a) {
-    $res = sql_query('select title, uid, pid, deleted, hidden from pages where pid>0 and uid=' . intval($uid));
+    $res = sql_query('select title, uid, pid, deleted, hidden from pages where pid>-1 and uid=' . intval($uid));
     $page = sql_fetch_array($res);
     if (!$page) {
       return FALSE;
@@ -771,7 +781,7 @@
   /**
    * @param $s
    */
-  function objectToString ($s) {
+  function objectToString($s) {
     if (preg_match('/^A|O:[0-9]+:/i', $s)) {
       $s = unserialize($s);
     }
@@ -783,7 +793,20 @@
 
     $s = preg_replace(";\n|\r\t;", ' ', $s);
     $s = crop($s);
+
     return $s;
+  }
+
+  /**
+   * @param array $a
+   */
+  function sendAsFlatTableWithPaths (array $a) {
+    foreach ($a as $i => $row) {
+      if ($row['pid']) {
+        $a[$i]['path'] = getFormattedRootline($row['pid']);
+      }
+    }
+    sendAsFlatTable($a);
   }
 
   /**
@@ -795,6 +818,7 @@
     $l = array();
     if (!sizeof($a)) {
       echo "No records\n";
+
       return;
     }
     $cols = array_keys($a[0]);
@@ -802,8 +826,9 @@
 
     foreach ($a as $y => $row) {
       foreach ($row as $x => $d) {
-    $a[$y][$x] = objectToString($a[$y][$x]);
-      }}
+        $a[$y][$x] = objectToString($a[$y][$x]);
+      }
+    }
     foreach ($a as $y => $row) {
       foreach ($row as $x => $d) {
         $h[$x] = $x;
@@ -1006,4 +1031,75 @@
     if (is_file(PATH_site . '.t3tool_data.php')) {
       include(PATH_site . '.t3tool_data.php');
     }
+  }
+
+  /**
+   * @param $sql
+   */
+  function sql_tail($sql) {
+    $n = 20;
+    $follow = TRUE;
+
+    $a = sql_get_rows($sql . ' limit ' . intval($n));
+    $a = array_reverse($a);
+
+    $l = array();
+
+    $cols = array_keys($a[0]);
+    $footer[$cols[0]] = count($a);
+
+    foreach ($a as $y => $row) {
+      foreach ($row as $x => $d) {
+        $a[$y][$x] = objectToString($a[$y][$x]);
+      }
+    }
+    foreach ($a as $y => $row) {
+      foreach ($row as $x => $d) {
+        $h[$x] = $x;
+        $l[$x] = max($l[$x], strlen($d));
+        $l[$x] = max($l[$x], strlen($x));
+      }
+    }
+
+    foreach ($a as $y => $row) {
+      foreach ($row as $x => $d) {
+        $a[$y][$x] = str_pad($d, $l[$x]);
+        $h[$x] = str_pad($h[$x], $l[$x]);
+        $footer[$x] = str_pad($footer[$x], $l[$x]);
+        $b[$x] = str_pad('', $l[$x], '-');
+      }
+    }
+    echo "+-" . implode('-+-', $b) . "-+\n";
+    echo "| " . implode(' | ', $h) . " |\n";
+    echo "+-" . implode('-+-', $b) . "-+\n";
+    foreach ($a as $y => $row) {
+      echo '| ';
+      echo implode(' | ', $row) . " |\n";
+    }
+
+    if ($follow) {
+      $last = $row['uid'];
+      while (TRUE) {
+        $a = sql_get_rows($sql . ' limit 20');
+        $a = array_reverse($a);
+
+        foreach ($a as $y => $row) {
+          if ($a[$y]['uid'] <= $last) {
+            continue;
+          }
+          $last = $a[$y]['uid'];
+
+          echo '| ';
+          foreach ($row as $x => $d) {
+            $a[$y][$x] = objectToString($a[$y][$x]);
+            $a[$y][$x] = str_pad($a[$y][$x], $l[$x]);
+          }
+
+          echo implode(' | ', $a[$y]) . " |\n";
+        }
+        sleep(1);
+      }
+    }
+
+
   }

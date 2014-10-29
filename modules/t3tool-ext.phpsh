@@ -398,7 +398,7 @@
       default :
         die('Usage :
   t3tool ext list
-            t3tool show < ext>
+  t3tool show < ext>
   t3tool ext config < extkey>
   t3tool ext dependencies
 
@@ -456,8 +456,10 @@
 
   function t3tool_ext_cmdaliases() {
     return array(
-      'en' => 'ext enable',
       'dis' => 'ext disable',
+      'en' => 'ext enable',
+      'pmi' => 'ext show',
+      'pml' => 'ext available',
     );
   }
 

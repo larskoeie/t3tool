@@ -16,8 +16,7 @@
   function t3tool_search_handlecmd($args) {
     global $label;
 
-    $table = $args[0];
-    $q = $args[1];
+    $q = $args[0];
 
     if (isset($label[$table])) {
       $lab = $label[$table];
@@ -25,65 +24,61 @@
       $lab = 'uid';
     }
 
-    if (!$table) {
+    if (!$q) {
       die("Usage:
-  t3tool search <table> <string>
-    Will search table in usual columns.
+  t3tool search <string>
+    Will search tables.
     \n");
     }
 
 
-    $search_fields = array(
-      'pages' => array(
-        'title' => 1,
-      ),
-      'sys_domain' => array(
-        'domainName' => 1,
-      ),
-      'sys_template' => array(
-        'title' => 1,
-        'config' => 1,
-      ),
-      'tt_content' => array(
-        'header' => 1,
-        'list_type' => 1,
-        'CType' => 1,
-        'bodytext' => 1,
-      ),
-      'tt_news' => array(
-        'title' => 1,
-      )
-    );
-
-    $or = "(t.uid='$q'";
-    if (isset($search_fields[$table])) {
-      foreach ($search_fields[$table] as $field => $conf) {
-        $or .= ' or t.' . $field . ' like "%' . $q . '%"';
-        $select .= ',t.' . $field;
+    foreach ($GLOBALS['TCA'] as $table => $table_conf) {
+      if (!isset($table_conf['ctrl']['searchFields'])) {
+        continue;
       }
-    }
-    $or .= ')';
-    $where = ' and ' . $or;
+      $or = '';
+      $select = '';
 
-    $sql = "
-    select t.$lab as title, t.uid, t.pid, t.hidden,
+      $search_fields = explode(',', $table_conf['ctrl']['searchFields']);
+
+      $or = "(t.uid='$q'";
+      if (isset($search_fields)) {
+        foreach ($search_fields as $field) {
+          $field = trim($field);
+          if (!$field) {
+            continue;
+          }
+          $or .= ' or t.' . $field . ' like "%' . $q . '%"';
+          $select .= ',t.' . $field;
+        }
+      }
+      $or .= ')';
+      $where = ' and ' . $or;
+
+      $sql = "
+    select SQL_CALC_FOUND_ROWS t.$lab as title, t.uid, t.pid,
     '$table' as _table  $select
     from $table as t 
     left join pages as p on (p.uid=t.pid) 
     where 1 " . $where . getDeleteClause($table, 't') . "
     group by t.uid
+    limit 10
     ";
 
-    $res = sql_query($sql);
+      $rows = sql_get_rows($sql);
+      if (sizeof($rows)) {
+        $total = sql_get_row('select found_rows() as total');
+        $total = $total['total'];
+        echo "\n" . $table . ' : ' . $total . ' rows' . "\n";
 
-    $rows = array();
-    while ($row = sql_fetch_array($res)) {
-      $row['_match'] = cropAndHilite($row['config'], $q);
-      $row['_table'] = $table;
-      $rows[] = $row;
 
+        foreach ($rows as $i => $row) {
+          $rows[$i]['_match'] = cropAndHilite($row['config'], $q);
+          $rows[$i]['_table'] = $table;
+
+        }
+        sendAsFlatTable($rows);
+      }
     }
-    print_r($rows);
-    showRecordsInPageTree($rows);
 
   }

@@ -29,6 +29,21 @@
         break;
 
       //
+      case 'stat' :
+        $recs =
+          sql_get_rows('SELECT pid, COUNT( * ) AS c
+          FROM tt_news
+          LEFT JOIN pages on pages.uid=fe_user.pid
+          WHERE NOT deleted
+          GROUP BY pid
+          ORDER BY c DESC
+          LIMIT 0 , 30');
+
+        sendAsFlatTable($feusers);
+
+        break;
+
+      //
       // Create fe_user
       //
       case 'create' :
@@ -49,7 +64,10 @@
       // Set fe_user's password.
       //
       case 'password' :
-        $user = getSingleRecordByString('fe_users', $username, array('username', 'email'));
+        $user = getSingleRecordByString('fe_users', $username, array(
+          'username',
+          'email'
+        ));
         $password = trim($args[1]);
         if (!$password) {
           $password = readline("Enter new password for frontend user $username : ");
@@ -97,7 +115,10 @@
       // Add a group to a user
       //
       case 'addgroup' :
-        $user = getSingleRecordByString('fe_users', $username, array('username', 'email'));
+        $user = getSingleRecordByString('fe_users', $username, array(
+          'username',
+          'email'
+        ));
         $group = getSingleRecordByString('fe_groups', $args[1], array('title'));
         $groups = array();
         if (trim($user['usergroup'])) {
@@ -113,7 +134,10 @@
       // Remove a group from a user
       //
       case 'rmgroup' :
-        $user = getSingleRecordByString('fe_users', $username, array('username', 'email'));
+        $user = getSingleRecordByString('fe_users', $username, array(
+          'username',
+          'email'
+        ));
         $group = getSingleRecordByString('fe_groups', $args[1], array('title'));
         $groups = array_fill_keys(explode(',', trim($user['usergroup'])), TRUE);
         unset($groups[$group['uid']]);
@@ -128,7 +152,10 @@
         if (!trim($username)) {
           die("Usage : t3tool feuser show <username, email or uid>. Case insensitive.\n");
         }
-        $user = getSingleRecordByString('fe_users', $username, array('username', 'email'));
+        $user = getSingleRecordByString('fe_users', $username, array(
+          'username',
+          'email'
+        ));
 
         sendRecordAsTable($user);
         break;
@@ -140,7 +167,10 @@
         if (!trim($username)) {
           die("Usage : t3tool feuser enable <username or uid>. Case insensitive.\n");
         }
-        $user = getSingleRecordByString('fe_users', $username, array('username', 'email'));
+        $user = getSingleRecordByString('fe_users', $username, array(
+          'username',
+          'email'
+        ));
 
         if ($user['disable'] == 0) {
           die($user['username'] . " already enabled.\n");
@@ -159,7 +189,10 @@
         if (!trim($username)) {
           die("Usage : t3tool feuser disable <username or uid>. Case insensitive.");
         }
-        $user = getSingleRecordByString('fe_users', $username, array('username', 'email'));
+        $user = getSingleRecordByString('fe_users', $username, array(
+          'username',
+          'email'
+        ));
 
         if ($user['disable'] == 1) {
           die($user['username'] . " already disabled.\n");
@@ -178,7 +211,10 @@
         if (!trim($username)) {
           die("Usage : t3tool feuser delete <username or uid>. Case insensitive.");
         }
-        $user = getSingleRecordByString('fe_users', $username, array('username', 'email'));
+        $user = getSingleRecordByString('fe_users', $username, array(
+          'username',
+          'email'
+        ));
 
         sql_query("delete from fe_users where uid =  " . $user['uid'] . " limit 1");
         echo $user['username'] . " deleted.\n";

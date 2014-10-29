@@ -1,8 +1,8 @@
 <?php
   /**
-   * t3tool-user.phpsh
+   * t3tool-history.phpsh
    *
-   * Handling of backend users and backend user groups.
+   * Shows database elements history.
    *
    * @package t3tool
    * @author Lars Køie
@@ -20,38 +20,52 @@
       //
       // List
       //
-      case 'list' :
-        $items = sql_get_rows("
-        select sys_history.uid, sys_history.tstamp, be_users.username, sys_history.tablename, sys_history.recuid, sys_history.fieldlist
-        from sys_history
-        left join sys_log on sys_log.uid=sys_history.sys_log_uid
-        left join be_users on be_users.uid=sys_log.userid
-        order by sys_history.uid desc
-        limit 20");
+      case 'tail' :
+        sql_tail("
+          select sys_history.uid, sys_history.tstamp, be_users.username, sys_history.tablename, sys_history.recuid, sys_history.fieldlist
+          from sys_history
+          left join sys_log on sys_log.uid=sys_history.sys_log_uid
+          left join be_users on be_users.uid=sys_log.userid
+          order by sys_history.uid desc
+          "
+        ) ;
 
-        if (!$items) {
-          die("No matching items.\n");
-        }
-
-        foreach ($items as $i=>$item) {
-
-          $items[$i]['tstamp'] = strftime('%d.%m.%Y %H.%M', $item['tstamp']);
-        }
-        sendAsFlatTable($items);
         break;
 
 
+      case 'element' :
+        list($table, $uid) = explode(':', $q);
+        if (!$uid) {
+          die("Usage : t3tool history element <table:uid>\n");
+        }
+
+        $items = sql_get_rows("
+        select sys_history.uid, sys_history.tstamp, be_users.username, sys_history.fieldlist
+        from sys_history
+        left join sys_log on sys_log.uid=sys_history.sys_log_uid
+        left join be_users on be_users.uid=sys_log.userid
+        where sys_history.tablename = '" . $table . "' and sys_history.recuid = " . intval($uid) . "
+        order by sys_history.uid desc
+        limit 20");
+
+        foreach ($items as $i => $item) {
+          $items[$i]['tstamp'] = strftime('%d.%m.%Y %H.%M', $item['tstamp']);
+        }
+        sendAsFlatTable($items);
+
+        break;
       default :
         die("Usage :
   t3tool history list
-    List last history events.
-    ");
+    List last history events.\n");
 
     }
   }
 
+  /**
+   * @return array
+   */
   function t3tool_history_cmdaliases() {
-    return array(
-    );
+    return array();
 
   }

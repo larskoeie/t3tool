@@ -49,6 +49,9 @@
         sendRecordAsTable($record);
         break;
 
+      case 'tail' :
+        sql_tail('select uid, crdate, msg, data_var from tx_devlog order by uid desc');
+        break;
 
     }
   }

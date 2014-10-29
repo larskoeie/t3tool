@@ -14,7 +14,7 @@
    */
   function t3tool_domain_handlecmd($args) {
     $realurl_config = $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['realurl'];
-    $realurl_configured = (bool) $realurl_config;
+    $realurl_configured = (bool)$realurl_config;
 
     $cmd = array_shift($args);
     $domain = trim(strtolower($args[0]));
@@ -27,13 +27,13 @@
       case 'list' :
       case 'find' :
         $domains = sql_get_rows("
-        select sys_domain.uid as uid, domainName, sys_domain.hidden, pages.uid as pid, pages.title as pageTitle, 'sys_domain' as _table
+        select sys_domain.uid as uid, domainName, sys_domain.hidden, pid, 'sys_domain' as _table
         from sys_domain
-        left join pages on pages.uid=sys_domain.pid order by sys_domain.hidden asc, sys_domain.pid asc, sys_domain.sorting asc"
+        order by sys_domain.hidden asc, sys_domain.pid asc, sys_domain.sorting asc"
         );
 
         if ($realurl_configured) {
-          foreach ($domains as $i=>$domain) {
+          foreach ($domains as $i => $domain) {
             if (isset($GLOBALS['TYPO3_CONF_VARS']['EXTCONF'][$domain['domainName']])) {
               if ($GLOBALS['TYPO3_CONF_VARS']['EXTCONF'][$domain['domainName']]['pagePath']['rootpage_id'] == $domain['pid']) {
                 $domains[$i]['realurl'] = 'OK';
@@ -46,7 +46,7 @@
           }
         }
         if ($cmd == 'list') {
-          sendAsFlatTable($domains);
+          sendAsFlatTableWithPaths($domains);
         }
         if ($cmd == 'find') {
           showRecordsInPageTree($domains);
@@ -105,6 +105,9 @@
       case 'add-record' :
       case 'add-realurl' :
         $pid = $args[1];
+        if (!trim($domain)) {
+          die ("Usage : t3tool domain add <domainName> <pid>\n");
+        }
         if (!trim($pid)) {
           die ("Usage : t3tool domain add <domainName> <pid>\n");
         }
@@ -270,6 +273,7 @@
           break;
       }
     }
+
     return $ip;
 
   }

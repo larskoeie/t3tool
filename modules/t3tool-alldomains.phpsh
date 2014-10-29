@@ -27,10 +27,11 @@ function t3tool_alldomains_handlecmd($args) {
     case "disable" :
       sql_query("update sys_domain set hidden=1 where 1 " . $where);
       $ar = sql_affected_rows();
-      if (!$ar) {
-        die("No enabled domains found.\n");
+      if ($ar) {
+        echo "Disabling $ar domain(s)... done.\n";
+      } else {
+        echo ("No enabled domains found.\n");
       }
-      echo "Disabling $ar domain(s)... done.\n";
 
       break;
 

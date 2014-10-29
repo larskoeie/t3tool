@@ -1,6 +1,6 @@
 <?php
   /**
-   * t3tool-user.phpsh
+   * t3tool-log.phpsh
    *
    * Handling of backend users and backend user groups.
    *
@@ -18,7 +18,7 @@
 
     switch ($cmd) {
       //
-      // List users
+      // List
       //
       case 'list' :
         $items = sql_get_rows("select tstamp, userid, details, log_data from sys_log order by uid desc limit 20");
@@ -35,35 +35,13 @@
         sendAsFlatTable($items);
         break;
 
+      case 'tail' :
+        sql_tail('select uid, tstamp, userid, details, log_data from sys_log order by uid desc');
+        break;
 
       default :
         die("Usage :
-  t3tool user list [<username, email or uid>]
-    List all users.
-  t3tool user show <username, email or uid>
-    Show details of single user.
-  t3tool user enable <username, email or uid>
-    Enable single user.
-  t3tool user disable <username, email or uid>
-    Disable single user.
-  t3tool user delete <username, email or uid>
-    Delete single user. NO going back !
-  t3tool user setadmin <username, email or uid>
-    Make user admin.
-  t3tool user clradmin <username, email or uid>
-    Make user non-admin.
-  t3tool user groups [<title>]
-    List all user groups or filtered by title.
-  t3tool user showgroup [<title>]
-    Show user groups with all fields.
-  t3tool user addgroup <username, email or uid> <group uid or title>
-    Add group to user.
-  t3tool user rmgroup <username, email or uid> <group uid or title>
-    Remove group from user.
-  t3tool user password <username, email or uid>
-    Set users password (passwrord will be prompted).
-  t3tool user create <username, email or uid>
-    Create admin user (password will be prompted).
+
 
     ");
 

@@ -56,15 +56,17 @@ function t3tool_template_handlecmd($args) {
     # TODO : find some way to move this to t3tool-ts.phpsh
     #
     case 'set' :
+      $pid = $args[0];
       $key = $args[1];
       $value = $args[2];
-      $pid = $args[0];
-      $page = getSingleRecordByString('pages', $pid);
-      $pid = $page['uid'];
 
       if (!trim($value)) {
         die("Usage : t3tool template set <pid> <key> <value>\n");
       }
+
+      $page = getSingleRecordByString('pages', $pid);
+      $pid = $page['uid'];
+
       echo "Setting '$key' to '$value' on page '" . $page['title'] . "'... ";
 
       $line = "\n\n# Added by t3tool\n$key = $value\n";
