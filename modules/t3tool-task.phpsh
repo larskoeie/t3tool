@@ -25,7 +25,7 @@
         $tasks = getRecordsByString('tx_scheduler_task', $query, array('classname'), 'uid, disable, classname, nextexecution, lastexecution_time, serialized_task_object');
 
         if (!$tasks) {
-          die("No matching tasks.\n");
+          return("No matching tasks.\n");
         }
 
         foreach ($tasks as $i=>$task) {
@@ -47,7 +47,7 @@
       //
       case 'show' :
         if (!trim($query)) {
-          die("Usage : t3tool task show <classname or uid>. Case insensitive.\n");
+          return("Usage : t3tool task show <classname or uid>. Case insensitive.\n");
         }
         $task = getSingleRecordByString('tx_scheduler_task', $query, array('classname'));
         if ($task['serialized_task_object']) {
@@ -68,12 +68,12 @@
       //
       case 'enable' :
         if (!trim($query)) {
-          die("Usage : t3tool task enable <classname or uid>. Case insensitive.\n");
+          return("Usage : t3tool task enable <classname or uid>. Case insensitive.\n");
         }
         $task = getSingleRecordByString('tx_scheduler_task', $query, array('classname'));
 
         if ($task['disable'] == 0) {
-          die($task['classname'] . " already enabled.\n");
+          return($task['classname'] . " already enabled.\n");
         }
 
         echo("Enabling task " . $task['classname'] . "... ");
@@ -87,12 +87,12 @@
       //
       case 'disable' :
         if (!trim($query)) {
-          die("Usage : t3tool task disable <classname or uid>. Case insensitive.");
+          return("Usage : t3tool task disable <classname or uid>. Case insensitive.");
         }
         $task = getSingleRecordByString('tx_scheduler_task', $query, array('classname'));
 
         if ($task['disable'] == 1) {
-          die($task['classname'] . " already disabled.\n");
+          return($task['classname'] . " already disabled.\n");
         }
         echo("Disabling task " . $task['classname'] . "... ");
 
@@ -106,7 +106,7 @@
       //
       case 'delete' :
         if (!trim($query)) {
-          die("Usage : t3tool task delete <classname or uid>. Case insensitive.");
+          return("Usage : t3tool task delete <classname or uid>. Case insensitive.");
         }
         $task = getSingleRecordByString('tx_scheduler_task', $query, array());
 
@@ -115,16 +115,14 @@
         break;
 
       default :
-        die("Usage :
-  t3tool task list [<classname or uid>]
-    List all users.
+        return("t3tool task list [<classname or uid>]
+    List all tasks.
   t3tool task enable <classname or uid>
-    Enable single user.
+    Enable single task.
   t3tool task disable <classname or uid>
-    Disable single user.
+    Disable single task.
   t3tool task delete <classname or uid>
-    Delete single user. NO going back !
-
+    Delete single task. NO going back !
     ");
 
     }

@@ -29,14 +29,14 @@
       // just set
       case 'set' :
         if ($cmd == 'add' && $exists) {
-          die("Already exists. Use 'set' or 'change'.\n");
+          return ("Already exists. Use 'set' or 'change'.\n");
         }
         if ($cmd == 'change' && !$exists) {
-          die("Does not exist. Use 'set' or 'add'.\n");
+          return ("Does not exist. Use 'set' or 'add'.\n");
         }
         $value = $args[1];
         if (!strlen(trim($value))) {
-          die ("Usage:
+          return  ("Usage:
           t3tool config add path value
             Will set value if it does not exist.
           t3tool config change path value
@@ -53,7 +53,8 @@
         break;
 
       default :
-        die("Usage: t3tool config get\n");
+        return ("t3tool config get
+        ");
     }
   }
 

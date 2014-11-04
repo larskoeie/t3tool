@@ -24,7 +24,7 @@
         $items = sql_get_rows("select tstamp, userid, details, log_data from sys_log order by uid desc limit 20");
 
         if (!$items) {
-          die("No matching items.\n");
+          return("No matching items.\n");
         }
 
         foreach ($items as $i=>$item) {
@@ -40,10 +40,10 @@
         break;
 
       default :
-        die("Usage :
-
-
-    ");
+        return("Usage :
+        log list <query>
+        log tail
+        ");
 
     }
   }

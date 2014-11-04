@@ -9,6 +9,7 @@
         'allfeusers removeemail',
         'alladddresses removeemail',
         'alldomains disable',
+        'cc config',
       ),
     ),
 

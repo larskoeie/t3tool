@@ -25,19 +25,18 @@ switch ($cmd) {
   #   
   case 'show' :
     if (! trim($id)) {
-    	die("Usage : t3tool file show <title or uid>. Case insensitive.\n");  		  
+    	return("Usage : t3tool file show <title or uid>. Case insensitive.\n");  		  
     }
     $record = sql_get_row ("select * from sys_file where 1 " . $where);
     if (! $record)
-    	die("File not found.\n");
+    	return("File not found.\n");
     	
     sendRecordAsTable($record);
     break;	
 
 
   default :
-	  die("Usage : 
-  t3tool file list
+	  return("t3tool file list
     List all files.
   t3tool file show <name or uid>
     Show details of single file.

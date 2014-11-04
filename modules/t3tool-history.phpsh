@@ -36,7 +36,7 @@
       case 'element' :
         list($table, $uid) = explode(':', $q);
         if (!$uid) {
-          die("Usage : t3tool history element <table:uid>\n");
+          return("Usage : t3tool history element <table:uid>\n");
         }
 
         $items = sql_get_rows("
@@ -55,8 +55,7 @@
 
         break;
       default :
-        die("Usage :
-  t3tool history list
+        return("t3tool history list
     List last history events.\n");
 
     }

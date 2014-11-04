@@ -167,7 +167,7 @@
       #
       case 'show' :
         if (!trim($ext)) {
-          die("Usage : t3tool ext show <extkey>.\n");
+          return("Usage : t3tool ext show <extkey>.\n");
         }
         print_R($EM_CONF[$ext]);
 
@@ -177,10 +177,10 @@
       case 'install' :
       case 'enable' :
         if (!isset($EM_CONF[$ext])) {
-          die ("Extension not present\n");
+          return ("Extension not present\n");
         }
         if (in_array($ext, $exts)) {
-          die ("Extension already installed\n");
+          return ("Extension already installed\n");
         }
 
         echo "Installing $ext... ";
@@ -213,7 +213,7 @@
       case 'uninstall' :
       case 'disable':
         if (!in_array($ext, $exts)) {
-          die ("Extension not installed\n");
+          return ("Extension not installed\n");
         }
         echo "Uninstalling $ext... ";
 
@@ -237,7 +237,7 @@
 
       case 'config' :
         if (!trim($ext)) {
-          die("Usage : t3tool ext config <extkey>.\n");
+          return("Usage : t3tool ext config <extkey>.\n");
         }
         print_R(unserialize($GLOBALS['TYPO3_CONF_VARS']['EXT']['extConf'][$ext]));
         break;
@@ -396,10 +396,9 @@
         break;
 
       default :
-        die('Usage :
-  t3tool ext list
-  t3tool show < ext>
-  t3tool ext config < extkey>
+        return('t3tool ext list
+  t3tool show <ext>
+  t3tool ext config <extkey>
   t3tool ext dependencies
 
 ');

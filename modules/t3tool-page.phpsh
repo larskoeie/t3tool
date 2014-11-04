@@ -26,7 +26,7 @@
       //
       case 'show' :
         if (!trim($title)) {
-          die("Usage : t3tool page show <title or uid>. Case insensitive.\n");
+          return("Usage : t3tool page show <title or uid>. Case insensitive.\n");
         }
         $page = getSingleRecordByString('pages', $title, array('title'));
         sendRecordAsTable($page);
@@ -38,7 +38,7 @@
       case 'add' :
         $pid = $args[1];
         if (!trim($pid)) {
-          die ("Usage : t3tool page add <title> <parent's title or pid>");
+          return ("Usage : t3tool page add <title> <parent's title or pid>");
         }
         if (!is_int($pid)) {
           $pages = sql_get_rows("select uid from pages where title like '%ppid%'");
@@ -54,11 +54,11 @@
       //
       case 'delete' :
         if (!trim($title)) {
-          die("Usage : t3tool page delete <title or uid>. Case insensitive.");
+          return("Usage : t3tool page delete <title or uid>. Case insensitive.");
         }
         sql_query("update pages set deleted=1 where " . $where . " limit 1");
         if (!sql_affected_rows()) {
-          die("Page not found.");
+          return("Page not found.");
         }
 
         break;
@@ -69,11 +69,11 @@
       case "hide" :
       case "disable" :
         if (!trim($title)) {
-          die("Usage : t3tool page hide <title or uid>. Case insensitive.");
+          return("Usage : t3tool page hide <title or uid>. Case insensitive.");
         }
         sql_query("update pages set hidden=1 where 1 " . $where . " limit 1");
         if (!sql_affected_rows()) {
-          die("Page not found.");
+          return("Page not found.");
         }
         break;
 
@@ -83,11 +83,24 @@
       case "unhide" :
       case "enable" :
         if (!trim($title)) {
-          die("Usage : t3tool page unhide <title or uid>. Case insensitive.");
+          return("Usage : t3tool page unhide <title or uid>. Case insensitive.");
         }
         sql_query("update pages set hidden=0 where 1 " . $where . " limit 1");
         if (!sql_affected_rows()) {
-          die("Page not found.");
+          return("Page not found.");
+        }
+        break;
+
+      //
+      case 'rootline' :
+        $a = array();
+        if (!$argv[2]) {
+          return("Usage : t3tool rootline <uid or page-title>\n  Show the rootline of page\n");
+        }
+        $res = sql_query('select title, uid, pid, deleted, hidden from pages where uid=' . intval($args[0]) . ' or title like "' . $args[0] . '"');
+        while ($row = sql_fetch_array($res)) {
+          $a = getRootline($row['uid']);
+          sendAsFlatTable($a, TRUE);
         }
         break;
 
@@ -96,7 +109,7 @@
       //
       case 'pidlist' :
         if (!$title) {
-          die("Usage: t3tool page pidlist <pid>");
+          return("Usage: t3tool page pidlist <pid>");
         }
 
         $pids = getPids($title);
@@ -106,12 +119,11 @@
         break;
 
       default :
-        echo "Usage :
-        t3tool page add <title> <title or pid of parent page>
-        t3tool page enable <title or uid>
-        t3tool page disable <title or uid>
-        t3tool page delete <title or uid>
-        t3tool page pidlist <uid>
+        return "  t3tool page add <title> <title or pid of parent page>
+  t3tool page enable <title or uid>
+  t3tool page disable <title or uid>
+  t3tool page delete <title or uid>
+  t3tool page pidlist <uid>
     ";
 
     }

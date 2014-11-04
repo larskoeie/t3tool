@@ -45,7 +45,7 @@ function t3tool_template_handlecmd($args) {
     #
     case 'show' :
       if (!trim($id)) {
-        die("Usage : t3tool template show <title or uid>. Case insensitive.\n");
+        return("Usage : t3tool template show <title or uid>. Case insensitive.\n");
       }
       $tpl = getSingleRecordByString("sys_template", $id, array('title'));
       sendRecordAsTable($tpl);
@@ -61,7 +61,7 @@ function t3tool_template_handlecmd($args) {
       $value = $args[2];
 
       if (!trim($value)) {
-        die("Usage : t3tool template set <pid> <key> <value>\n");
+        return("Usage : t3tool template set <pid> <key> <value>\n");
       }
 
       $page = getSingleRecordByString('pages', $pid);
@@ -73,13 +73,12 @@ function t3tool_template_handlecmd($args) {
 
       sql_query("update sys_template set config=concat(config, '$line') where pid=$pid and not hidden order by sorting limit 1");
       if (! sql_affected_rows())
-          die("No templates on page. Nothing done.\n");
+          return("No templates on page. Nothing done.\n");
       echo "done.\n";
       break;
 
     default :
-      die("Usage :
-  t3tool template list
+      return("  t3tool template list
     List all templates.
   t3tool template show <uid or title>
     Show single template with all fields.

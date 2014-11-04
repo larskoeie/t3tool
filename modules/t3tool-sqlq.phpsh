@@ -17,17 +17,16 @@ function t3tool_sqlq_handlecmd($args) {
   $sql = $args[0];
 
   if (!trim($sql)) {
-    die("Usage:\n  t3tool sqlq <sql query>\n    Will run an sql query on TYPO3 database and output the result if any.\n");
+    return("t3tool sqlq <sql query>\n    Will run an sql query on TYPO3 database and output the result if any.\n");
   }
 
   $result = sql_get_rows($sql);
   if ($result == FALSE) {
-    die("No rows.\n");
+    return("No rows.\n");
   }
   if ($result === TRUE) {
     $updated = sql_affected_rows();
-    die('OK - ' . $updated . " affected rows.\n");
-
+    return('OK - ' . $updated . " affected rows.\n");
   }
 
   sendAsFlatTable($result);

@@ -17,7 +17,7 @@
     $php = $args[0];
 
     if (!trim($php)) {
-      die("Usage:
+      return ("Usage:
       t3tool php <php>
         Will run an sql query on TYPO3 database and output the result if any.
       ");

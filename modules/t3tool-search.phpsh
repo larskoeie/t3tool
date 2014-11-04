@@ -25,10 +25,10 @@
     }
 
     if (!$q) {
-      die("Usage:
+      return("Search commands:
   t3tool search <string>
     Will search tables.
-    \n");
+    ");
     }
 
 

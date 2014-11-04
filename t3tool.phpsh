@@ -74,6 +74,16 @@
     'tt_news' => 'title',
   );
 
+  $GLOBALS['options'] = getopt('dlp:rv', array(
+    'deleted::',
+    'local::',
+    'pid::',
+    'recursive::',
+    'verbose::'
+  ));
+
+  $args = $argv;
+
   // split arguments and flag
   /**
    * Flags are :
@@ -82,23 +92,12 @@
    * - l : "local configuration" : Changes to configuration are written to the local one, the one in .gitignore (localconf_local or AdditionalConfiguration).
    * - p : "pid" - all operations are filtered to elements on this pid - not implemented yet
    * - r : "recursive" - infinitely - not implemented yet
+   * - v : verbose - show all output
    *
    */
-  foreach ($argv as $i => $arg) {
-    if ($arg{0} == '-') {
-      if ($arg{1} == '-') {
 
-      } else {
-        $flag = $arg{1};
-        $val = substr($arg, 2);
-        $GLOBALS['flags'][$flag] = $val ? $val : TRUE;
-      }
-    } else {
-      $args[] = $arg;
-    }
-  }
-  if (sizeof($GLOBALS['flags'])) {
-    echo "Flags: " . print_r($GLOBALS['flags']);
+  if (sizeof($GLOBALS['options'])) {
+    echo "Options: "; var_dump($GLOBALS['options']);
   }
 
   // remove arg-0 which is path to script
@@ -107,7 +106,7 @@
   // handle command
   t3tool_handlecmd($args);
 
-  function t3tool_handlecmd($argv) {
+  function t3tool_handlecmd($argv, $level=0) {
     $args = $argv;
     $module = array_shift($argv);
 
@@ -138,6 +137,7 @@
     );
     $aliases = array();
 
+
     // aliases defined by modules
     foreach ($modules as $m) {
       require_once("modules/t3tool-$m.phpsh");
@@ -164,7 +164,7 @@
       if (is_array($aliases[$module])) {
         // run commmands
         foreach ($aliases[$module]['commands'] as $str) {
-          foreach ($args as $k=>$v) {
+          foreach ($args as $k => $v) {
             $str = str_replace('$' . $k, $v, $str);
           }
           $child_args = explode(' ', $str);
@@ -179,44 +179,39 @@
       }
     }
 
+    // handle help function
+    if ($module == 'help') {
+      if ($argv[0]) {
+        $modules = array($argv[0]);
+      }
+      $out = "Usage:\n";
+      foreach ($modules as $m) {
+        $function = 't3tool_' . $m . '_handlecmd';
+        if (function_exists($function)) {
+          $out .= $function(array('')) . "\n";
+        }
+
+      }
+      echo $out;
+    }
+
     // dispatch command and arguments to module
     if (in_array($module, $modules)) {
       $function = 't3tool_' . $module . '_handlecmd';
       if (function_exists($function)) {
-        $function($argv);
+        $function($argv, $level+1);
       }
 
-      return; // this is temporary
     } else {
-      echo 'Usage :
-    t3tool user
-      Handle a single BE user.
-    t3tool allusers
-      Handle all BE users.
-    t3tool search
-      Do a search in database.
-    t3tool show
-      Select a single record from database.
-    t3tool domain
-      Handle a single domain record.
-    t3tool alldomains
-      Handle all domain records.
-    t3tool template
-      Handle a single template record.
-    t3tool rootline <pid>
-      Show rootline of page.
-    t3tool search <table> <string>
-      Search table for string.
-    t3tool sqlq <query>
-      Execute DB query.
-    t3tool page
-      Handle a single page.
-    t3tool sql
-      Do other sql stuff.
-
-  ';
+      //
     }
 
+    if (is_array($GLOBALS['info'])) {
+      foreach ($GLOBALS['info'] as $s) {
+        echo str_repeat('  ', $level + 1) . $s . "\n";
+      }
+      $GLOBALS['info'] = array();
+    }
 
   }
 
@@ -266,7 +261,7 @@
     }
 
     global $TYPO3_CONF_VARS;
-    echo "Connecting to database ...";
+    echo "Connecting to database... ";
 
     $db = $TYPO3_CONF_VARS['DB'];
     $typo_db_host = $db['host'];
@@ -281,7 +276,14 @@
     # connect to db
     global $mysqli;
     $mysqli = mysqli_connect($typo_db_host, $typo_db_username, $typo_db_password);
-    mysqli_select_db($mysqli, $typo_db);
+    if (!$mysqli) {
+      die("Could not connect to DB\n");
+    }
+
+    $success = mysqli_select_db($mysqli, $typo_db);
+    if (!$success) {
+      die("Could not select DB\n");
+    }
 
     $GLOBALS['DBIsInited'] = TRUE;
 
@@ -305,10 +307,12 @@
     if ($res === FALSE) {
       $error = mysqli_error($mysqli);
       if ($error) {
-        print "$error\n$sql\n";
+        print "\n  SQL error : $error\n  SQL : $sql\n";
       }
-      foreach (debug_backtrace() as $bt) {
-        print $bt['function'] . ', ' . $bt['file'] . ', line ' . $bt['line'] . "\n";
+      if ($debug) {
+        foreach (debug_backtrace() as $bt) {
+          print $bt['function'] . ', ' . $bt['file'] . ', line ' . $bt['line'] . "\n";
+        }
       }
 
       return FALSE;
@@ -451,12 +455,13 @@
    *
    * @return string something like "TYPO3/Welcome/About..."
    */
-  function getFormattedRootline ($pid) {
+  function getFormattedRootline($pid) {
     $a = array();
     pa($pid, $a);
     foreach ($a as $page) {
       $titles[] = $page['title'];
     }
+
     return implode(' / ', array_reverse($titles));
   }
 
@@ -588,11 +593,11 @@
   }
 
   function getFlag($f) {
-    if (!isset($GLOBALS['flags'][$f])) {
+    if (!isset($GLOBALS['options'][$f])) {
       return FALSE;
     }
 
-    return (bool)$GLOBALS['flags'][$f];
+    return $GLOBALS['options'][$f];
   }
 
   /**
@@ -800,7 +805,7 @@
   /**
    * @param array $a
    */
-  function sendAsFlatTableWithPaths (array $a) {
+  function sendAsFlatTableWithPaths(array $a) {
     foreach ($a as $i => $row) {
       if ($row['pid']) {
         $a[$i]['path'] = getFormattedRootline($row['pid']);
@@ -944,13 +949,13 @@
   function setLocalConf($path, $value, $local = NULL) {
     $path = explode('.', $path);
 
-    $data = & $GLOBALS['TYPO3_CONF_VARS'];
+    $data = &$GLOBALS['TYPO3_CONF_VARS'];
     $exists = TRUE;
     foreach ($path as $index) {
       if (!isset($data[$index])) {
         $exists = FALSE;
       }
-      $data = & $data[$index];
+      $data = &$data[$index];
     }
     $olddata = $data;
     $data = $value;
@@ -1103,3 +1108,48 @@
 
 
   }
+
+
+  function output_info($s, $level = 0) {
+    $GLOBALS['info'][] = $s;
+  }
+
+  function output_sendinfo($level) {
+
+  }
+
+  /**
+   * @param $s
+   */
+  function output_cmd($s, $level = 0) {
+    if ($GLOBALS['pos'] > 0) {
+      echo "\n";
+    }
+    $out = $s . '... ';
+    echo $out;
+    $GLOBALS['pos'] = strlen($out);
+  }
+
+  /**
+   *
+   */
+  function output_ok($s = '', $level = 0) {
+    $out = '[OK]';
+    echo str_repeat(' ', 200 - $GLOBALS['pos'] - strlen($out));
+    echo "\x1b[1;32m$out\x1b[0m\n";
+    $GLOBALS['pos'] = 0;
+    output_sendinfo($level + 1);
+  }
+
+  /**
+   * @param $s
+   */
+  function output_fail($s, $level = 0) {
+    $out = '[Fail]';
+    echo str_repeat(' ', 200 - $GLOBALS['pos'] - strlen($out));
+    echo "\x1b[1;31m$out\x1b[0m\n";
+    $GLOBALS['pos'] = 0;
+    output_sendinfo($level + 1);
+  }
+
+

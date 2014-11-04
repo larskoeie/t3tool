@@ -29,7 +29,7 @@
         }
         $records = getRecordsByString('sys_registry', $key, array('entry_namespace', 'entry_key'));
         if (!$records) {
-          die();
+          return;
         }
         sendAsFlatTable($records);
 
@@ -37,7 +37,7 @@
 
       case 'get' :
         if (!$key) {
-          die("Usage:\n  t3tool registry get <key>\n  t3tool registry get <namespace/key>\n");
+          return("Usage:\n  t3tool registry get <key>\n  t3tool registry get <namespace/key>\n");
         }
         $sql = "select entry_value from sys_registry where entry_key like '%$key%'";
         if ($namespace) {
@@ -45,7 +45,7 @@
         }
         $record = sql_get_row($sql);
         if (!$record) {
-          die();
+          return;
         }
         $value = unserialize($record['entry_value']);
         print_r($value);
@@ -54,30 +54,34 @@
       case 'set' :
         $value = $args[1];
         if (!$key) {
-          die("Usage:\n  t3tool registry set <namespace/key> <value>\n");
+          return("Usage:\n  t3tool registry set <namespace/key> <value>\n");
         }
         if (! $namespace) {
-          die('');
+          return('');
         }
         if (!$value) {
-          die();
+          return;
         }
         // check for existence
         $sql = "select entry_value from sys_registry where entry_key like '%$key%' and entry_namespace='$namespace'";
 
         $record = sql_get_row($sql);
         if (!$record) {
-          die();
+          return;
         }
         $value = serialize($value);
-        $sql = "update sys_registry set entry_value='$value' where entry_key like '%$key%' and entry_namespace='$namespace'";
+        $sql = "update sys_registry set entry_value='$value' where entry_key = '$key' and entry_namespace='$namespace'";
 
         print_r($sql);
         break;
 
 
       default :
-        die("Usage:\n  t3tool registry get\n");
+        return("Registry commands:
+  registry list
+  registry get
+  registry set
+        ");
     }
 
   }
@@ -89,5 +93,7 @@
     return array(
       'rget' => 'registry get',
       'vget' => 'registry get',
+      'rset' => 'registry set',
+      'vset' => 'registry set',
     );
   }

@@ -25,10 +25,10 @@
       case 'enable' :
         $users = getRecordsByString('fe_users');
 
-        echo "Enabling " . sizeof($users) . " frontend users... ";
+        output_cmd("Enabling " . sizeof($users) . " frontend users");
         sql_query("update fe_users set disable=0 where 1 " . $where);
-        echo "done.\n";
-
+        output_ok();
+        return TRUE;
         break;
 
       //
@@ -37,9 +37,10 @@
       case 'disable' :
         $users = getRecordsByString('fe_users');
 
-        echo "Disabling " . sizeof($users) . " frontend users... ";
+        output_cmd("Disabling " . sizeof($users) . " frontend users");
         sql_query("update fe_users set disable=1 where username not like '\_%' " . $where);
-        echo "done.\n";
+        output_ok();
+        return TRUE;
 
         break;
 
@@ -56,33 +57,33 @@
       case 'disableemail' :
       case 'removeemail' :
         $users = getRecordsByString('fe_users');
-        echo "Removing email from " . sizeof($users) . " frontend users... ";
+        output_cmd("Removing email from " . sizeof($users) . " frontend users");
         sql_query("update fe_users set email='removed' where 1 " . $where);
-        echo "done.\n";
-        break;
+output_ok();
+      return TRUE;
+      break;
 
       //
       // Removes password
       //
       case 'removepassword' :
         $users = sql_get_rows('select uid from fe_users where disable ' . $where);
-        echo "Removing paswords from " . sizeof($users) . " users... ";
+        output_cmd("Removing paswords from " . sizeof($users) . " users");
         sql_query("update fe_users set password='removed' where disable " . $where);
-        echo "done.\n";
+output_ok();
+        return TRUE;
         break;
 
       default :
-        die ("Usage :
-    t3tool allfeusers enable [except <username, email or uid>]
-      Enable all FE users.
-    t3tool allfeusers disable [except <username, email or uid>]
-      Disable all FE users.
-    t3tool allfeusers removeemail [except <username, email or uid>]
-      Remove all FE users emails.
-    t3tool allfeusers removepassword [except <username, email or uid>]
-      Remove all disabled FE users passwords. No going back! Use if you do not trust the hashing.
-
-    All username and email matches are case insensitive.		  
+        return ("All feusers commands:
+  t3tool allfeusers enable [except <username, email or uid>]
+    Enable all FE users.
+  t3tool allfeusers disable [except <username, email or uid>]
+    Disable all FE users.
+  t3tool allfeusers removeemail [except <username, email or uid>]
+    Remove all FE users emails.
+  t3tool allfeusers removepassword [except <username, email or uid>]
+    Remove all disabled FE users passwords. No going back! Use if you do not trust the hashing.
   ");
     }
 

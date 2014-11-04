@@ -28,6 +28,7 @@
 
       // both of the above
       case 'all' :
+
         t3tool_cc_content();
         t3tool_cc_config();
         break;
@@ -48,7 +49,7 @@
         break;
 
       default :
-        die("Usage:
+        return ("Clear cache commands:
   t3tool cc content
     Truncates all cache tables.
   t3tool cc config
@@ -70,15 +71,18 @@
    */
   function t3tool_cc_db() {
     $tables = sql_get_rows('show tables');
-    echo "Truncating tables prefixed 'cache_' or 'cf_'\n";
+    output_cmd("Truncating tables prefixed 'cache_' or 'cf_'");
     foreach ($tables as $table) {
       $temp = each($table);
       $table = $temp[1];
       if (preg_match('/^(cache)|(cf)_/', $table)) {
-        echo "Truncating $table\n";
+        output_cmd("Truncating $table");
         sql_query("truncate $table;");
       }
     }
+    output_ok();
+
+    return TRUE;
   }
 
   /**
@@ -92,7 +96,7 @@
    *
    */
   function t3tool_cc_config() {
-    echo "Clearing config cache... ";
+    output_cmd("Clearing config cache");
     $files = scandir(PATH_typo3conf);
     foreach ($files as $file) {
       if (preg_match('/^temp_CACHED/', $file)) {
@@ -101,8 +105,9 @@
     }
 
     rmdir_recursive(PATH_site . 'typo3temp/Cache/Code/');
-    echo "done.\n";
+    output_ok();
   }
+
 
   function rmdir_recursive($dir) {
     if (!is_dir($dir)) {

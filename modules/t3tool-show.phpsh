@@ -11,7 +11,7 @@
     $uid = $args[1];
 
     if (!$uid){
-      die("Usage: t3tool show <table> <uid>\n");
+      return ("t3tool show [table] [uid]\n");
     }
     $record = getSingleRecordByString($table, $uid);
     sendRecordAsTable($record);

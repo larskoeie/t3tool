@@ -54,7 +54,7 @@
           $password = readPassword("Enter password for new frontend user $username : ");
         }
         if (!$password) {
-          die("Usage: t3tool feuser create <pid> <username> [<password>]\n");
+          return("Usage: t3tool feuser create <pid> <username> [<password>]\n");
         }
         sql_query("insert into fe_users (username, password, pid) values ('$username', '$password', $pid)");
 
@@ -73,7 +73,7 @@
           $password = readline("Enter new password for frontend user $username : ");
         }
         if (!$password) {
-          die("Usage: t3tool feuser password <username> [<password>]\n");
+          return("Usage: t3tool feuser password <username> [<password>]\n");
         }
         sql_query("update fe_users set password='$password' where uid=" . $user['uid']);
         break;
@@ -85,7 +85,7 @@
         $groups = getRecordsByString('fe_groups', $username, array('title'), 'uid, title');
 
         if (!$groups) {
-          die("No matching groups.\n");
+          return("No matching groups.\n");
         }
 
         sendAsFlatTable($groups);
@@ -150,7 +150,7 @@
       //
       case 'show' :
         if (!trim($username)) {
-          die("Usage : t3tool feuser show <username, email or uid>. Case insensitive.\n");
+          return("Usage : t3tool feuser show <username, email or uid>. Case insensitive.\n");
         }
         $user = getSingleRecordByString('fe_users', $username, array(
           'username',
@@ -165,7 +165,7 @@
       //
       case 'enable' :
         if (!trim($username)) {
-          die("Usage : t3tool feuser enable <username or uid>. Case insensitive.\n");
+          return("Usage : t3tool feuser enable <username or uid>. Case insensitive.\n");
         }
         $user = getSingleRecordByString('fe_users', $username, array(
           'username',
@@ -173,7 +173,7 @@
         ));
 
         if ($user['disable'] == 0) {
-          die($user['username'] . " already enabled.\n");
+          return($user['username'] . " already enabled.\n");
         }
 
         echo("Enabling user " . $user['username'] . "... ");
@@ -187,7 +187,7 @@
       //
       case 'disable' :
         if (!trim($username)) {
-          die("Usage : t3tool feuser disable <username or uid>. Case insensitive.");
+          return("Usage : t3tool feuser disable <username or uid>. Case insensitive.");
         }
         $user = getSingleRecordByString('fe_users', $username, array(
           'username',
@@ -195,7 +195,7 @@
         ));
 
         if ($user['disable'] == 1) {
-          die($user['username'] . " already disabled.\n");
+          return($user['username'] . " already disabled.\n");
         }
         echo("Disabling user " . $user['username'] . "... ");
 
@@ -209,7 +209,7 @@
       //
       case 'delete' :
         if (!trim($username)) {
-          die("Usage : t3tool feuser delete <username or uid>. Case insensitive.");
+          return("Usage : t3tool feuser delete <username or uid>. Case insensitive.");
         }
         $user = getSingleRecordByString('fe_users', $username, array(
           'username',
@@ -221,6 +221,18 @@
         break;
 
 
+      default :
+        return ('t3tool feuser list
+        feuser find
+        feuser show
+        feuser stat
+        feuser members
+        feuser addgroup
+        feuser rmgroup
+        feuser enable
+        feuser disable
+        feuser delete
+        ');
     }
 
   }

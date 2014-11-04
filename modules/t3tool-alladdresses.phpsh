@@ -25,15 +25,16 @@
       case 'disableemail' :
       case 'removeemail' :
         $records  = getRecordsByString('tt_address');
-        echo "Removing email from " . sizeof($records) . " records... ";
+        output_cmd("Removing email from " . sizeof($records) . " records");
         sql_query("update tt_address set email='' where 1 " . $where);
-        echo "done.\n";
-        break;
+output_ok();
+      return TRUE;
+      break;
 
       default :
-        die ("Usage :
-    t3tool alladdresses removeemail
-      Remove all address emails.
+        return ("Alladdresses commands:
+  t3tool alladdresses removeemai
+    Remove all address emails.
   ");
     }
 

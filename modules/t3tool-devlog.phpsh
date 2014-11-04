@@ -14,9 +14,6 @@
    */
   function t3tool_devlog_handlecmd($args) {
     $cmd = strtolower(array_shift($args));
-    if (!$cmd) {
-      $cmd = 'list';
-    }
     $q = trim(strtolower($args[0]));
 
     switch ($cmd) {
@@ -27,7 +24,7 @@
         $items = getRecordsByString('tx_devlog', $q, array('msg'), 'uid, crdate, msg, data_var', 'crdate desc', 50);
 
         if (!$items) {
-          die("No matching items.\n");
+          return ("No matching items.\n");
         }
         foreach ($items as $i=>$item) {
           $items[$i]['crdate'] = strftime('%d.%m.%Y %H.%M', $items[$i]['crdate']);
@@ -43,7 +40,7 @@
         $record = getSingleRecordByString('tx_devlog', $q, array('msg'), 'msg');
 
         if (!$record) {
-          die("No matching items.\n");
+          return ("No matching items.\n");
         }
 
         sendRecordAsTable($record);
@@ -53,5 +50,9 @@
         sql_tail('select uid, crdate, msg, data_var from tx_devlog order by uid desc');
         break;
 
+      default :
+        return ('t3tool devlog tail
+t3tool devlog list
+        ');
     }
   }

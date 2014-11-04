@@ -1,60 +1,64 @@
 <?php
-/**
- * t3tool-alldomains.phpsh
- *
- * Handles the command "t3tool alldomains ...".
- *
- * @package t3tool
- * @author Lars Køie
- *
- */
+  /**
+   * t3tool-alldomains.phpsh
+   *
+   * Handles the command "t3tool alldomains ...".
+   *
+   * @package t3tool
+   * @author Lars Køie
+   *
+   */
 
-/**
- * @param $args
- */
-function t3tool_alldomains_handlecmd($args) {
-  $cmd = array_shift($args);
-  if ($args[0] == 'except') {
-    $domain = trim(strtolower($args[1]));
-    $where = " and (domainName not like '$domain' and uid != '$domain')";
-  }
+  /**
+   * @param $args
+   */
+  function t3tool_alldomains_handlecmd($args) {
+    $cmd = array_shift($args);
+    if ($args[0] == 'except') {
+      $domain = trim(strtolower($args[1]));
+      $where = " and (domainName not like '$domain' and uid != '$domain')";
+    }
 
-  switch ($cmd) {
+    switch ($cmd) {
 
-    #
-    # Hide (disable) all domains
-    #
-    case "disable" :
-      sql_query("update sys_domain set hidden=1 where 1 " . $where);
-      $ar = sql_affected_rows();
-      if ($ar) {
-        echo "Disabling $ar domain(s)... done.\n";
-      } else {
-        echo ("No enabled domains found.\n");
-      }
+      #
+      # Hide (disable) all domains
+      #
+      case "disable" :
+        output_cmd('Disabling all domains');
+        sql_query("update sys_domain set hidden=1 where 1 " . $where);
+        $ar = sql_affected_rows();
+        if ($ar) {
+          output_info("Disabled $ar domain(s)");
+          output_ok();
+        } else {
+          output_info("No enabled domains found.");
+        }
+        output_ok();
+        break;
 
-      break;
+      #
+      #
+      #
+      case "enable" :
+        output_cmd('Enabling all domains');
+        sql_query("update sys_domain set hidden=0 where 1 " . $where);
+        $ar = sql_affected_rows();
+        if (!$ar) {
+          output_info("No disabled domains found.");
+        }
+        output_info("Enabled $ar domain(s)");
+        output_ok();
+        break;
 
-    #
-    #
-    #
-    case "enable" :
-      sql_query("update sys_domain set hidden=0 where 1 " . $where);
-      $ar = sql_affected_rows();
-      if (!$ar) {
-        die("No disabled domains found.\n");
-      }
-      echo "Enabling $ar domain(s)... done.\n";
-      break;
 
-
-    default :
-      die("Usage :
-  t3tool alldomains enable [except <domain or uid>]
+      default :
+        return ("All domains commands:
+  t3tool alldomains enable
     Enable all domains.
-  t3tool alldomains disable [except <domain or uid>]
+  t3tool alldomains disable
     Disable all domains.
     ");
 
+    }
   }
-}
