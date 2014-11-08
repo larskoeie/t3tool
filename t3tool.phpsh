@@ -74,31 +74,101 @@
     'tt_news' => 'title',
   );
 
-  $GLOBALS['options'] = getopt('dlp:rv', array(
-    'deleted::',
-    'local::',
-    'pid::',
-    'recursive::',
-    'verbose::'
-  ));
 
+  /*
+    if (sizeof($GLOBALS['options'])) {
+      echo "Options: "; print_r($GLOBALS['options']);
+    }
+  */
+
+  /**
+   *
+   * Does not handle optional arguments - only required or no arguments
+   */
+  $so = 'dlp:rv';
+  $lo = array(
+    'deleted',
+    'local',
+    'pid::',
+    'raw',
+    'recursive',
+    'verbose'
+  );
+
+  foreach ($argv as $k => $v) {
+    if (!trim($v)) {
+      unset($argv[$k]);
+      continue;
+    }
+    $long = $v{0} == '-' && $v{1} == '-';
+    $short = !$long && $v{0} == '-';
+    $v = ltrim($v, '-');
+
+    if ($short) {
+      foreach (str_split($v) as $letter) {
+        if (preg_match("/$letter(:?)(:?)/", $so, $colons)) {
+          $optional = (bool)$colons[2];
+          $required = $colons[1] && !$colons[2];
+          unset($argv[$k]);
+          if ($optional || $required) {
+            $value = substr($v, 1);
+            if (!$value) {
+              $value = $argv[$k + 1];
+              unset($argv[$k + 1]);
+            }
+            $options[$letter] = $value;
+          } else {
+            $options[$letter] = TRUE;
+          }
+        }
+      }
+    }
+    if ($long) {
+      $optional = FALSE;
+      $required = FALSE;
+      foreach ($lo as $o) {
+        if ($o == $v . '::') {
+          $optional = TRUE;
+        } elseif ($o == $v . ':') {
+          $required = TRUE;
+        } elseif ($o == $v) {
+        } else {
+          continue;
+        }
+      }
+      var_dump(array(
+          $optional,
+          $required
+        ));
+      unset($argv[$k]);
+
+      if ($optional || $required) {
+        if (strpos($v, '=')) {
+          list($v, $value) = explode('=', $v);
+        } else {
+          $value = $argv[$k + 1];
+          unset($argv[$k + 1]);
+        }
+        $options[$v] = $value;
+      } else {
+        $options[$v] = TRUE;
+      }
+    }
+
+  }
+
+
+  $GLOBALS['options'] = array(
+    'deleted' => isset($options['d']) || $options['deleted'],
+    'local' => isset($options['l']) || $options['local'],
+    'pid' => isset($options['pid']) ? $options['pid'] : (isset($options['p']) ? $options['p'] : NULL),
+    'raw' => isset($options['raw']) ? $options['raw'] : FALSE,
+    'recursive' => isset($options['r']) || $options['recursive'],
+    'verbose' => isset($options['v']) || $options['verbose'],
+  );
   $args = $argv;
 
-  // split arguments and flag
-  /**
-   * Flags are :
-   * - d : include deleted records in lists and searches. Default is "exclude deleted records".
-   * - f : full - do not crop long strings
-   * - l : "local configuration" : Changes to configuration are written to the local one, the one in .gitignore (localconf_local or AdditionalConfiguration).
-   * - p : "pid" - all operations are filtered to elements on this pid - not implemented yet
-   * - r : "recursive" - infinitely - not implemented yet
-   * - v : verbose - show all output
-   *
-   */
 
-  if (sizeof($GLOBALS['options'])) {
-    echo "Options: "; var_dump($GLOBALS['options']);
-  }
 
   // remove arg-0 which is path to script
   array_shift($args);
@@ -106,7 +176,7 @@
   // handle command
   t3tool_handlecmd($args);
 
-  function t3tool_handlecmd($argv, $level=0) {
+  function t3tool_handlecmd($argv, $level = 0) {
     $args = $argv;
     $module = array_shift($argv);
 
@@ -147,6 +217,7 @@
       }
     }
 
+
     // global aliases
     $filename = PATH_script . 'includes/aliases.php';
     if (file_exists($filename)) {
@@ -182,28 +253,46 @@
     // handle help function
     if ($module == 'help') {
       if ($argv[0]) {
-        $modules = array($argv[0]);
-      }
-      $out = "Usage:\n";
-      foreach ($modules as $m) {
-        $function = 't3tool_' . $m . '_handlecmd';
+        $m = $argv[0];
+        $function = 't3tool_' . $m . '_usage_long';
         if (function_exists($function)) {
-          $out .= $function(array('')) . "\n";
+          $out = $function() . "\n";
         }
+      } else {
+        $out = "Usage:\n";
+        foreach ($modules as $m) {
+          $function = 't3tool_' . $m . '_usage_short';
+          if (function_exists($function)) {
+            $out .= $function() . "\n";
+          }
 
+        }
       }
       echo $out;
+      return;
+
+      /**
+       * Flags are :
+       * - d : include deleted records in lists and searches. Default is "exclude deleted records".
+       * - f : full - do not crop long strings
+       * - l : "local configuration" : Changes to configuration are written to the local one, the one in .gitignore (localconf_local or AdditionalConfiguration).
+       * - p : "pid" - all operations are filtered to elements on this pid - not implemented yet
+       * - r : "recursive" - infinitely - not implemented yet
+       * - v : verbose - show all output
+       *
+       */
+
     }
 
     // dispatch command and arguments to module
     if (in_array($module, $modules)) {
       $function = 't3tool_' . $module . '_handlecmd';
       if (function_exists($function)) {
-        $function($argv, $level+1);
+        $function($argv, $level + 1);
       }
 
     } else {
-      //
+      echo "Missing command. See 't3tool help' for more info\n";
     }
 
     if (is_array($GLOBALS['info'])) {
@@ -448,6 +537,22 @@
     $a = array_reverse($a);
 
     return $a;
+  }
+
+  /**
+   * @param     $pid
+   * @param int $depth
+   *
+   * @return array
+   */
+  function getPidList($pid, $depth = 100) {
+    $pages = sql_get_rows('select uid from pages where pid=' . intval($pid) . getDeleteClause('pages'));
+    $pids = array($pid);
+    foreach ($pages as $page) {
+      $pids = array_merge($pids, getPidList($page['uid']));
+    }
+
+    return $pids;
   }
 
   /**
@@ -812,6 +917,15 @@
       }
     }
     sendAsFlatTable($a);
+  }
+
+  /**
+   * @param $list
+   */
+  function sendRawElementList(array $list) {
+    foreach ($list as $element) {
+      echo $element . "\n";
+    }
   }
 
   /**

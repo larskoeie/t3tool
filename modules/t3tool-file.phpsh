@@ -35,12 +35,15 @@ switch ($cmd) {
     break;	
 
 
-  default :
-	  return("t3tool file list
+
+	}
+
+  function t3tool_file_usage_short () {
+    return("t3tool file list
     List all files.
   t3tool file show <name or uid>
     Show details of single file.
-    
+
   	   ");
 
-	}
+  }

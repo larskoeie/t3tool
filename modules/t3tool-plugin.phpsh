@@ -71,11 +71,14 @@ function t3tool_plugin_handlecmd($args) {
       sendAsFlatTable($plugins);
       break;
 
-    default :
-      return ('Plugin commands:
+  }
+}
+
+  function t3tool_plugin_usage_short () {
+    return ('Plugin commands:
   plugin list
   plugin find
   plugin stat
       ');
+
   }
-}

@@ -50,16 +50,11 @@
 
       default :
         return ("Clear cache commands:
-  t3tool cc content
-    Truncates all cache tables.
-  t3tool cc config
-    Deletes any cached code from extensions.
-  t3tool cc all
-    All of the above.
-  t3tool cc db
-    Truncate all cache tables in DB.
-  t3tool cc pics
-    Empties typo3temp/pics.
+  t3tool cc content - Truncates all cache tables.
+  t3tool cc config - Deletes any cached code from extensions.
+  t3tool cc all - All of the above.
+  t3tool cc db - Truncate all cache tables in DB.
+  t3tool cc pics - Empties typo3temp/pics.
 
   ");
     }
@@ -126,3 +121,13 @@
     rmdir($dir);
   }
 
+  function t3tool_cc_usage_short () {
+    return ("Clear cache commands:
+  t3tool cc content - Truncates all cache tables.
+  t3tool cc config - Deletes any cached code from extensions.
+  t3tool cc all - All of the above.
+  t3tool cc db - Truncate all cache tables in DB.
+  t3tool cc pics - Empties typo3temp/pics.
+  ");
+
+  }

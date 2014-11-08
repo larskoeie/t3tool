@@ -39,11 +39,6 @@
         sql_tail('select uid, tstamp, userid, details, log_data from sys_log order by uid desc');
         break;
 
-      default :
-        return("Usage :
-        log list <query>
-        log tail
-        ");
 
     }
   }
@@ -51,5 +46,13 @@
   function t3tool_log_cmdaliases() {
     return array(
       );
+
+  }
+
+  function t3tool_log_usage_short () {
+    return("Log commands:
+  log list <query>
+  log tail
+  ");
 
   }

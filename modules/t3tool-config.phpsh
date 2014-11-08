@@ -29,10 +29,10 @@
       // just set
       case 'set' :
         if ($cmd == 'add' && $exists) {
-          return ("Already exists. Use 'set' or 'change'.\n");
+          output_fail("Already exists. Use 'set' or 'change'.");
         }
         if ($cmd == 'change' && !$exists) {
-          return ("Does not exist. Use 'set' or 'add'.\n");
+          output_fail("Does not exist. Use 'set' or 'add'.");
         }
         $value = $args[1];
         if (!strlen(trim($value))) {
@@ -53,7 +53,7 @@
         break;
 
       default :
-        return ("t3tool config get
+        return ("t3tool config get - Get TYPO3-con
         ");
     }
   }
@@ -62,4 +62,11 @@
     return array(
       'eit' => 'config eit',
     );
+  }
+
+  function t3tool_config_usage_short () {
+    return ("Configuration commands:
+  t3tool config get - Get all TYPO3_CONF_VARS or part of it
+        ");
+
   }

@@ -82,3 +82,10 @@
     }
 
   }
+
+  function t3tool_search_usage_short () {
+    return("Search commands:
+  t3tool search - Search in tables.
+    ");
+
+  }

@@ -88,3 +88,17 @@ function t3tool_template_handlecmd($args) {
 
   }
 }
+
+  function t3tool_template_usage_short () {
+    return("Template commands:
+  t3tool template list - List all templates.
+  t3tool template show - Show single template with all fields.
+");
+
+  }
+
+  function t3tool_template_cmdaliases () {
+    return array(
+      'tpl' => 'template',
+    );
+  }

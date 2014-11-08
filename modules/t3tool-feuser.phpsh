@@ -221,19 +221,22 @@
         break;
 
 
-      default :
-        return ('t3tool feuser list
-        feuser find
-        feuser show
-        feuser stat
-        feuser members
-        feuser addgroup
-        feuser rmgroup
-        feuser enable
-        feuser disable
-        feuser delete
-        ');
     }
 
   }
 
+  function t3tool_feuser_usage_short () {
+    return ('Frontend user commands:
+  t3tool feuser list
+  feuser find
+  feuser show
+  feuser stat
+  feuser members
+  feuser addgroup
+  feuser rmgroup
+  feuser enable
+  feuser disable
+  feuser delete
+  ');
+
+  }

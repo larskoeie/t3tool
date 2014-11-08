@@ -114,7 +114,6 @@
         echo $task['uid'] . " deleted.\n";
         break;
 
-      default :
         return("t3tool task list [<classname or uid>]
     List all tasks.
   t3tool task enable <classname or uid>
@@ -126,4 +125,28 @@
     ");
 
     }
+  }
+
+  function t3tool_task_usage_short () {
+    return("Scheduler task commands:
+  t3tool task list - List all tasks.
+  t3tool task enable - Enable single task.
+  t3tool task disable - Disable single task.
+  t3tool task delete - Delete single task.
+    ");
+
+  }
+
+  function t3tool_task_usage_long () {
+    return("Scheduler task commands:
+  t3tool task list [<classname or uid>]
+    List all tasks.
+  t3tool task enable <classname or uid>
+    Enable single task.
+  t3tool task disable <classname or uid>
+    Disable single task.
+  t3tool task delete <classname or uid>
+    Delete single task. NO going back !
+    ");
+
   }

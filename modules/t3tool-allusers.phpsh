@@ -74,15 +74,21 @@
 
       default :
         return ("All users commands:
-  t3tool allusers enable
-    Enable all users.
-  t3tool allusers disable
-    Disable all users.
-  t3tool allusers removeemail
-    Remove all backend users emails.
-  t3tool allusers removepassword
-    Remove all disabled backend users passwords. No logging in and no going back.
+  t3tool allusers enable - Enable all users.
+  t3tool allusers disable - Disable all users.
+  t3tool allusers removeemail - Remove all backend users emails.
+  t3tool allusers removepassword - Remove all disabled backend users passwords. No logging in and no going back.
   ");
     }
+
+  }
+
+  function t3tool_allusers_usage_short () {
+    return ("All users commands:
+  t3tool allusers enable - Enable all users.
+  t3tool allusers disable - Disable all users.
+  t3tool allusers removeemail - Remove all backend users emails.
+  t3tool allusers removepassword - Remove all disabled backend users passwords.
+  ");
 
   }

@@ -32,10 +32,16 @@ output_ok();
       break;
 
       default :
-        return ("Alladdresses commands:
-  t3tool alladdresses removeemai
-    Remove all address emails.
+        return ("Commands to handle all tt_addresses :
+  t3tool alladdresses removeemail - Remove all tt_address emails.
   ");
     }
+
+  }
+
+  function t3tool_alladdresses_usage_short () {
+            return ("Commands to handle all tt_addresses :
+  t3tool alladdresses removeemail - Remove all tt_address emails.
+  ");
 
   }

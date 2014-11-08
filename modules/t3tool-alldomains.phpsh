@@ -54,11 +54,16 @@
 
       default :
         return ("All domains commands:
-  t3tool alldomains enable
-    Enable all domains.
-  t3tool alldomains disable
-    Disable all domains.
+  t3tool alldomains enable - Enable all domains.
+  t3tool alldomains disable - Disable all domains.
     ");
 
     }
   }
+
+function t3tool_alldomains_usage_short () {
+  return ("All domains commands:
+  t3tool alldomains enable - Enable all domains.
+  t3tool alldomains disable - Disable all domains.
+    ");
+}

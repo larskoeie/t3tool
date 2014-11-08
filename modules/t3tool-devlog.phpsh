@@ -51,8 +51,13 @@
         break;
 
       default :
-        return ('t3tool devlog tail
-t3tool devlog list
-        ');
     }
+  }
+
+  function t3tool_devlog_usage_short () {
+    return ('Devlog commands:
+  t3tool devlog tail -
+  t3tool devlog list - List latest devlog entries
+        ');
+
   }

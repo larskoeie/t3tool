@@ -75,13 +75,6 @@
         print_r($sql);
         break;
 
-
-      default :
-        return("Registry commands:
-  registry list
-  registry get
-  registry set
-        ");
     }
 
   }
@@ -96,4 +89,13 @@
       'rset' => 'registry set',
       'vset' => 'registry set',
     );
+  }
+
+  function t3tool_registry_usage_short () {
+    return("Registry commands:
+  registry list
+  registry get
+  registry set
+        ");
+
   }

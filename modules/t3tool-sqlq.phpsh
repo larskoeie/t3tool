@@ -32,3 +32,8 @@ function t3tool_sqlq_handlecmd($args) {
   sendAsFlatTable($result);
 
 }
+
+  function t3tool_sqlq_usage_short () {
+    return("SQL commands:
+  t3tool sqlq - Run an sql query on database and output the result.\n");
+  }

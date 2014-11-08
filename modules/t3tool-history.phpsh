@@ -54,9 +54,6 @@
         sendAsFlatTable($items);
 
         break;
-      default :
-        return("t3tool history list
-    List last history events.\n");
 
     }
   }
@@ -66,5 +63,11 @@
    */
   function t3tool_history_cmdaliases() {
     return array();
+
+  }
+
+  function t3tool_history_usage_short () {
+    return("History commands:
+  t3tool history list - List last history events.\n");
 
   }

@@ -292,3 +292,47 @@
     );
 
   }
+
+  function t3tool_domain_usage_short () {
+    return "Domain commands:
+  t3tool domain list - List domain records
+  t3tool domain dns - List domains and do a DNS lookup for each
+  t3tool domain check - List domains and check functionality for each
+  t3tool domain dnsandcheck - The two above, combined.
+  t3tool domain show - Show details of domain record
+  t3tool domain add-record - Add a domain record on a page.
+  t3tool domain add-realurl - Add a domain name to a realurl configuration. Will gracefully do nothing if realurl is not configured.
+  t3tool domain add - Both of the two above.
+  t3tool domain enable - Enable domain
+  t3tool domain movetotop - Move domaain to top
+  t3tool domain disable - Disable domain
+  t3tool domain delete - Delete domain
+    ";
+
+  }
+
+  function t3tool_domain_usage_long () {
+    return "Domain commands:
+  t3tool domain list - List all domain records
+  t3tool domain dns
+    Search for a DNS A-record for each domain, and list the IPs.
+  t3tool domain check
+    Create a unique file and retrieve it through that domain, list the result.
+  t3tool domain dnsandcheck
+    The two above, combined.
+  t3tool domain show <domain name>
+  t3tool domain add-record <domain name> <pid>
+    Add a domain record on a page.
+  t3tool domain add-realurl <domain name> <pid>
+    Add a domain name to a realurl configuration. Will gracefully do nothing if realurl is not configured.
+  t3tool domain add <domain name> <pid>
+    Both of the two above.
+  t3tool domain enable <domain name or uid>
+  t3tool domain movetotop <domain name or uid>
+  t3tool domain disable <domain name or uid>
+  t3tool domain delete <domain name or uid>
+
+  Domain name matches first exact, case insensitive. Then containing case insensitive.
+    ";
+
+  }

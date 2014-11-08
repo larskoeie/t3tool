@@ -62,7 +62,11 @@
     }
 
     // now add the extensions that are not installed
-    foreach (array('Local' => 'typo3conf/ext/', 'Global' => 'typo3/ext/', 'System' => 'typo3/sysext/') as $type => $path) {
+    foreach (array(
+               'Local' => 'typo3conf/ext/',
+               'Global' => 'typo3/ext/',
+               'System' => 'typo3/sysext/'
+             ) as $type => $path) {
       if (!is_dir($path)) {
         continue;
       }
@@ -167,7 +171,7 @@
       #
       case 'show' :
         if (!trim($ext)) {
-          return("Usage : t3tool ext show <extkey>.\n");
+          return ("Usage : t3tool ext show <extkey>.\n");
         }
         print_R($EM_CONF[$ext]);
 
@@ -237,7 +241,7 @@
 
       case 'config' :
         if (!trim($ext)) {
-          return("Usage : t3tool ext config <extkey>.\n");
+          return ("Usage : t3tool ext config <extkey>.\n");
         }
         print_R(unserialize($GLOBALS['TYPO3_CONF_VARS']['EXT']['extConf'][$ext]));
         break;
@@ -358,7 +362,12 @@
 
           );
 
-          if (in_array($filter, array('local', 'system', 'global')) && $filter != strtolower($project['type'])) {
+          if (in_array($filter, array(
+                'local',
+                'system',
+                'global'
+              )) && $filter != strtolower($project['type'])
+          ) {
             continue;
           }
 
@@ -396,12 +405,6 @@
         break;
 
       default :
-        return('t3tool ext list
-  t3tool show <ext>
-  t3tool ext config <extkey>
-  t3tool ext dependencies
-
-');
     }
   }
 
@@ -462,3 +465,12 @@
     );
   }
 
+  function t3tool_ext_usage_short() {
+    return ('Extension commands:
+  t3tool ext list - List installed extensions
+  t3tool show - Show info of extension
+  t3tool ext config - Show config of extension
+  t3tool ext dependencies - Show dependency information for all extensions
+');
+
+  }

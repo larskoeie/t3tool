@@ -112,31 +112,35 @@
           return("Usage: t3tool page pidlist <pid>");
         }
 
-        $pids = getPids($title);
+        $pids = getPidList($title);
         echo "There are " . count($pids) . " pages:\n";
         echo (implode(",", $pids));
         echo "\n\n";
         break;
 
-      default :
-        return "  t3tool page add <title> <title or pid of parent page>
-  t3tool page enable <title or uid>
-  t3tool page disable <title or uid>
-  t3tool page delete <title or uid>
-  t3tool page pidlist <uid>
-    ";
 
     }
   }
 
-function getPids($pid, $depth=100) {
-  $pages = sql_get_rows('select * from pages where pid=' . $pid);
-  if (!isset($pids)) {
-    $pids = array();
-  }
-  foreach ($pages as $page) {
-    $pids[] = $page['uid'];
-    $pids = array_merge($pids, getPids($page['uid']));
-  }
-  return $pids;
+function t3tool_page_usage_short () {
+  return "Page commands:
+  t3tool page add - Add a subpage
+  t3tool page enable - Enable a page
+  t3tool page disable - Disable a page
+  t3tool page delete - Delete a page
+  t3tool page pidlist - Get a list of pids under a page
+  ";
+
 }
+
+  function t3tool_page_usage_long () {
+    return "Page commands:
+  t3tool page add <title> <title or pid of parent page>
+  t3tool page enable <title or uid>
+  t3tool page disable <title or uid>
+  t3tool page delete <title or uid>
+  t3tool page pidlist [page uid]
+    Comma separated list of supplied page id and all subpages infinitely recursively.
+    ";
+
+  }

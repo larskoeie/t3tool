@@ -76,15 +76,21 @@ output_ok();
 
       default :
         return ("All feusers commands:
-  t3tool allfeusers enable [except <username, email or uid>]
-    Enable all FE users.
-  t3tool allfeusers disable [except <username, email or uid>]
-    Disable all FE users.
-  t3tool allfeusers removeemail [except <username, email or uid>]
-    Remove all FE users emails.
-  t3tool allfeusers removepassword [except <username, email or uid>]
-    Remove all disabled FE users passwords. No going back! Use if you do not trust the hashing.
+  t3tool allfeusers enable - Enable all FE users.
+  t3tool allfeusers disable - Disable all FE users.
+  t3tool allfeusers removeemail - Remove all FE users emails.
+  t3tool allfeusers removepassword - Remove all disabled FE users passwords.
   ");
     }
+
+  }
+
+  function t3tool_allfeusers_usage_short () {
+    return ("All feusers commands:
+  t3tool allfeusers enable - Enable all FE users.
+  t3tool allfeusers disable - Disable all FE users.
+  t3tool allfeusers removeemail - Remove all FE users emails.
+  t3tool allfeusers removepassword - Remove all disabled FE users passwords. No going back! Use if you do not trust the hashing.
+  ");
 
   }
