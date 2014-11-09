@@ -183,27 +183,27 @@
     $modules = array(
       'alladdresses',
       'alldomains',
-      'allfeusers',
+//      'allfeusers',
       'allusers',
       'cc',
       'config',
       'data',
-      'deprecation',
-      'devlog',
+//      'deprecation',
+//      'devlog',
       'domain',
       'ext',
-      'feuser',
-      'history',
+//      'feuser',
+//      'history',
       'log',
       'page',
       'plugin',
-      'registry',
-      'search',
-      'show',
+//      'registry',
+//      'search',
+//      'show',
       'sqlq',
       'user',
       'task',
-      'template'
+//      'template'
     );
     $aliases = array();
 

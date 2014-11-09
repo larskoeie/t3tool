@@ -178,8 +178,8 @@
         break;
 
 
-      case 'install' :
-      case 'enable' :
+      case 'install - in develop' :
+      case 'enable - in develop' :
         if (!isset($EM_CONF[$ext])) {
           return ("Extension not present\n");
         }
@@ -214,8 +214,8 @@
         t3tool_cc_config();
         break;
 
-      case 'uninstall' :
-      case 'disable':
+      case 'uninstall - in develop' :
+      case 'disable - in develop':
         if (!in_array($ext, $exts)) {
           return ("Extension not installed\n");
         }
@@ -348,7 +348,7 @@
         break;
 
 
-      case 'report' :
+      case 'report - in develop' :
         $projects = array();
 
         foreach ($EM_CONF as $extKey => $info) {
