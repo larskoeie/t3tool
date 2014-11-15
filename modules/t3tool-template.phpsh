@@ -102,3 +102,18 @@ function t3tool_template_handlecmd($args) {
       'tpl' => 'template',
     );
   }
+
+  /**
+   * @return array
+   */
+  function t3tool_template_completion () {
+    return array(
+      'template' => array(
+        'find' => 1,
+        'list' => 1,
+        'set' => 1,
+        'show' => 1
+      ),
+    );
+
+  }

@@ -82,3 +82,14 @@ function t3tool_plugin_handlecmd($args) {
       ');
 
   }
+
+  /**
+   * @return array
+   */
+  function t3tool_plugin_completion () {
+    return array(
+
+      "plugin" => array('list' => 1),
+    );
+
+  }

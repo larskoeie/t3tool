@@ -28,3 +28,13 @@
     }
 
   }
+
+  /**
+   * @return array
+   */
+  function t3tool_data_completion () {
+    return array(
+
+    );
+
+  }

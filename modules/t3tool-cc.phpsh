@@ -131,3 +131,13 @@
   ");
 
   }
+
+  /**
+   * @return array
+   */
+  function t3tool_cc_completion () {
+    return array(
+
+    );
+
+  }

@@ -47,3 +47,13 @@ switch ($cmd) {
   	   ");
 
   }
+
+  /**
+   * @return array
+   */
+  function t3tool_file_completion () {
+    return array(
+
+    );
+
+  }

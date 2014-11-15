@@ -45,3 +45,14 @@ output_ok();
   ");
 
   }
+
+
+  /**
+   * @return array
+   */
+  function t3tool_alladdresses_completion () {
+    return array(
+
+    );
+
+  }

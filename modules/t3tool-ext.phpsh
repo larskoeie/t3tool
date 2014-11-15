@@ -474,3 +474,19 @@
 ');
 
   }
+
+  /**
+   * @return array
+   */
+  function t3tool_ext_completion () {
+    return array(
+      "ext" => array(
+        'config' => $extensions,
+        'dependencies' => 1,
+        'list' => 1,
+        'show' => $extensions
+      ),
+
+    );
+
+  }

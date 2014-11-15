@@ -67,7 +67,7 @@
       case 'removepassword' :
         $users = sql_get_rows('select uid from be_users where disable ' . $where);
         output_cmd("Removing paswords from " . sizeof($users) . " users");
-        sql_query("update be_users set password='removed' where disable " . $where);
+        sql_query("update be_users set password='removed@example.org' where disable " . $where);
         output_ok();
         return TRUE;
         break;
@@ -90,5 +90,20 @@
   t3tool allusers removeemail - Remove all backend users emails.
   t3tool allusers removepassword - Remove all disabled backend users passwords.
   ");
+
+  }
+
+  /**
+   * @return array
+   */
+  function t3tool_allusers_completion () {
+    return array(
+      'allusers' => array(
+        'disable' => $users,
+        'enable' => $users,
+        'removeemail' => $users,
+      ),
+
+    );
 
   }

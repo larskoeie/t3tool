@@ -150,3 +150,13 @@
     ");
 
   }
+
+  /**
+   * @return array
+   */
+  function t3tool_task_completion () {
+    return array(
+
+    );
+
+  }

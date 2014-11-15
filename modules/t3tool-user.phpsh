@@ -227,7 +227,7 @@
         $users = getRecordsByString('be_users', $username, array(
           'username',
           'email'
-        ), 'uid, username, email, disable');
+        ), 'uid, username, email, disable, concat(substring(password, 1, 8), "...") as password');
 
         if (!$users) {
           output_info("No matching users.\n");
@@ -468,4 +468,53 @@
     Kick user off system.
     ");
 
+  }
+
+  function t3tool_user_completion() {
+    return array(
+      'user' => array(
+        'addgroup' => 't3tool_user_completion_users, t3tool_user_completion_groups',
+        'clradmin' => 't3tool_user_completion_users',
+        'create' => 1,
+        'delete' => 't3tool_user_completion_users',
+        'disable' => 't3tool_user_completion_users_enabled',
+        'enable' => 't3tool_user_completion_users_disabled',
+        'groups' => 't3tool_user_completion_users',
+        'list' => 1,
+        'members' => 't3tool_user_completion_groups',
+        'password' => 't3tool_user_completion_users',
+        'rmgroup' => 't3tool_user_completion_users, t3tool_user_completion_groups',
+        'setgroup' => 't3tool_user_completion_users, t3tool_user_completion_groups',
+        'show' => 't3tool_user_completion_users',
+        'showgroup' => 't3tool_user_completion_groups',
+      ),
+    );
+  }
+
+  /**
+   * @return array
+   */
+  function t3tool_user_completion_users () {
+    return sql_get_column('select username from be_users where not deleted');
+  }
+
+  /**
+   * @return array
+   */
+  function t3tool_user_completion_users_enabled () {
+    return sql_get_column('select username from be_users where not deleted and not disable ');
+  }
+
+  /**
+   * @return array
+   */
+  function t3tool_user_completion_users_disabled () {
+    return sql_get_column('select username from be_users where not deleted and disable');
+  }
+
+  /**
+   * @return array
+   */
+  function t3tool_user_completion_groups () {
+    return sql_get_column('select title from be_groups where not deleted');
   }

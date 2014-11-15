@@ -144,3 +144,13 @@ function t3tool_page_usage_short () {
     ";
 
   }
+
+  /**
+   * @return array
+   */
+  function t3tool_page_completion () {
+    return array(
+
+    );
+
+  }

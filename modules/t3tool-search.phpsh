@@ -89,3 +89,16 @@
     ");
 
   }
+
+  /**
+   * @return array
+   */
+  function t3tool_search_completion () {
+    return array(
+      'search' => array(
+        'pages' => 1,
+        'tt_content' => 1
+      ),
+    );
+
+  }

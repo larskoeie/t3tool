@@ -70,3 +70,13 @@
         ");
 
   }
+
+  /**
+   * @return array
+   */
+  function t3tool_config_completion () {
+    return array(
+
+    );
+
+  }

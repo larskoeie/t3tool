@@ -61,3 +61,13 @@
         ');
 
   }
+
+  /**
+   * @return array
+   */
+  function t3tool_devlog_completion () {
+    return array(
+
+    );
+
+  }

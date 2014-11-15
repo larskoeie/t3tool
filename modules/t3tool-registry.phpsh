@@ -99,3 +99,13 @@
         ");
 
   }
+
+  /**
+   * @return array
+   */
+  function t3tool_registry_completion () {
+    return array(
+
+    );
+
+  }

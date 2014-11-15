@@ -56,3 +56,12 @@
   ");
 
   }
+  /**
+   * @return array
+   */
+  function t3tool_log_completion () {
+    return array(
+
+    );
+
+  }

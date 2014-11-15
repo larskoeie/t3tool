@@ -71,3 +71,13 @@
   t3tool history list - List last history events.\n");
 
   }
+
+  /**
+   * @return array
+   */
+  function t3tool_history_completion () {
+    return array(
+
+    );
+
+  }

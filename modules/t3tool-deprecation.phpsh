@@ -54,3 +54,13 @@
       }
     }
   }
+
+  /**
+   * @return array
+   */
+  function t3tool_deprecation_completion () {
+    return array(
+
+    );
+
+  }

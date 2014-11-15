@@ -8,29 +8,139 @@
    *
    */
 
+  # init
+  define('TYPO3_MODE', 'BE');
+  define('PATH_script', dirname(__FILE__) . '/');
+  define('PATH_site', getcwd() . '/');
+  define('PATH_typo3conf', PATH_site . 'typo3conf/');
+  define('PATH_t3lib', PATH_site . 't3lib/');
+
+  error_reporting(E_ALL ^ E_NOTICE ^ E_DEPRECATED);
+  //  error_reporting(E_ALL);
+
+  $GLOBALS['modules'] = array(
+    'alladdresses',
+    'alldomains',
+    'allfeusers',
+    'allusers',
+    'cc',
+    'config',
+    'data',
+    'deprecation',
+    'devlog',
+    'domain',
+    'ext',
+    'feuser',
+    'history',
+    'log',
+    'page',
+    'plugin',
+    'registry',
+    'search',
+    'show',
+    'sqlq',
+    'user',
+    'task',
+    'template'
+  );
+
+  // require all modules
+  foreach ($GLOBALS['modules'] as $m) {
+    require_once("modules/t3tool-$m.phpsh");
+  }
+
+  // build command map for bash completion
+  // aliases defined by modules
+  $GLOBALS['commands'] = array();
+  foreach ($GLOBALS['modules'] as $m) {
+    $function = 't3tool_' . $m . '_completion';
+    if (function_exists($function)) {
+      $GLOBALS['commands'] = array_merge($GLOBALS['commands'], $function());
+    }
+  }
+
+  $aliases = array();
+
+  // build aliases
+  // aliases defined by modules
+  foreach ($GLOBALS['modules'] as $m) {
+    $function = 't3tool_' . $m . '_cmdaliases';
+    if (function_exists($function)) {
+      $GLOBALS['aliases'] = array_merge($GLOBALS['aliases'], $function());
+    }
+  }
+
+  // global aliases
+  $filename = PATH_script . 'includes/aliases.php';
+  if (file_exists($filename)) {
+    $GLOBALS['aliases'] = array_merge($GLOBALS['aliases'], include($filename));
+  }
+
+  // aliases defined by user
+  $user = posix_getpwuid(posix_getuid());
+  $filename = $user['dir'] . '/.t3tool/aliases.php';
+  if (file_exists($filename)) {
+    include($filename);
+  }
+
   while (!is_dir('typo3conf') && getcwd() != '/') {
     chdir('..');
   }
   if (!is_dir('typo3conf')) {
     die('TYPO3 not found');
   }
-
-  # init
-  error_reporting(E_ALL ^ E_NOTICE ^ E_DEPRECATED);
-  //  error_reporting(E_ALL);
-
-  define('PATH_script', dirname(__FILE__) . '/');
-  define('PATH_site', getcwd() . '/');
-  define('PATH_typo3conf', PATH_site . 'typo3conf/');
-  define('PATH_t3lib', PATH_site . 't3lib/');
+  
   readData();
+
 
   $GLOBALS['version_4'] = is_file(PATH_typo3conf . 'localconf.php');
   $GLOBALS['version_6'] = is_file(PATH_typo3conf . 'LocalConfiguration.php');
 
   readConf();
+
+  // if called from bash_completion, leave early
+  if ($argv[1] == '_complete') {
+    die(getTabCompleteString($argv[2], $argv[3]));
+  }
+
   buildTCA();
 
+
+  /**
+   * @param $current
+   * @param $comp_line
+   *
+   * @return string
+   *
+   * TODO: Does not work when command contains options ("-p" , "--recursive")
+   */
+  function getTabCompleteString($current, $comp_line) {
+    $args = explode(' ', trim($comp_line));
+    array_shift($args);
+
+    if ($current == $args[sizeof($args) - 1]) {
+      array_pop($args);
+    }
+    $t = $GLOBALS['commands'];
+    foreach ($args as $n => $arg) {
+      if (!isset($t[$arg])) {
+        return '';
+      }
+      if (is_string($t[$arg])) {
+        $funcs = explode(',', $t[$arg]);
+        $func = trim($funcs[sizeof($args) - $n - 1]);
+        if (function_exists($func)) {
+          return implode(' ', $func());
+        }
+      }
+      $t = $t[$arg];
+    }
+    if (is_array($t)) {
+      return implode(' ', array_keys($t));
+    }
+
+    return '';
+  }
 
   /**
    * @param $prompt
@@ -74,167 +184,23 @@
     'tt_news' => 'title',
   );
 
-
-  /*
-    if (sizeof($GLOBALS['options'])) {
-      echo "Options: "; print_r($GLOBALS['options']);
-    }
-  */
-
-  /**
-   *
-   * Does not handle optional arguments - only required or no arguments
-   */
-  $so = 'dlp:rv';
-  $lo = array(
-    'deleted',
-    'local',
-    'pid::',
-    'raw',
-    'recursive',
-    'verbose'
-  );
-
-  foreach ($argv as $k => $v) {
-    if (!trim($v)) {
-      unset($argv[$k]);
-      continue;
-    }
-    $long = $v{0} == '-' && $v{1} == '-';
-    $short = !$long && $v{0} == '-';
-    $v = ltrim($v, '-');
-
-    if ($short) {
-      foreach (str_split($v) as $letter) {
-        if (preg_match("/$letter(:?)(:?)/", $so, $colons)) {
-          $optional = (bool)$colons[2];
-          $required = $colons[1] && !$colons[2];
-          unset($argv[$k]);
-          if ($optional || $required) {
-            $value = substr($v, 1);
-            if (!$value) {
-              $value = $argv[$k + 1];
-              unset($argv[$k + 1]);
-            }
-            $options[$letter] = $value;
-          } else {
-            $options[$letter] = TRUE;
-          }
-        }
-      }
-    }
-    if ($long) {
-      $optional = FALSE;
-      $required = FALSE;
-      foreach ($lo as $o) {
-        if ($o == $v . '::') {
-          $optional = TRUE;
-        } elseif ($o == $v . ':') {
-          $required = TRUE;
-        } elseif ($o == $v) {
-        } else {
-          continue;
-        }
-      }
-      var_dump(array(
-          $optional,
-          $required
-        ));
-      unset($argv[$k]);
-
-      if ($optional || $required) {
-        if (strpos($v, '=')) {
-          list($v, $value) = explode('=', $v);
-        } else {
-          $value = $argv[$k + 1];
-          unset($argv[$k + 1]);
-        }
-        $options[$v] = $value;
-      } else {
-        $options[$v] = TRUE;
-      }
-    }
-
-  }
-
-
-  $GLOBALS['options'] = array(
-    'deleted' => isset($options['d']) || $options['deleted'],
-    'local' => isset($options['l']) || $options['local'],
-    'pid' => isset($options['pid']) ? $options['pid'] : (isset($options['p']) ? $options['p'] : NULL),
-    'raw' => isset($options['raw']) ? $options['raw'] : FALSE,
-    'recursive' => isset($options['r']) || $options['recursive'],
-    'verbose' => isset($options['v']) || $options['verbose'],
-  );
   $args = $argv;
-
-
 
   // remove arg-0 which is path to script
   array_shift($args);
 
   // handle command
-  t3tool_handlecmd($args);
+  echo t3tool_handlecmd($args);
 
   function t3tool_handlecmd($argv, $level = 0) {
     $args = $argv;
     $module = array_shift($argv);
 
-    $modules = array(
-      'alladdresses',
-      'alldomains',
-      'allfeusers',
-      'allusers',
-      'cc',
-      'config',
-      'data',
-      'deprecation',
-      'devlog',
-      'domain',
-      'ext',
-      'feuser',
-      'history',
-      'log',
-      'page',
-      'plugin',
-      'registry',
-      'search',
-      'show',
-      'sqlq',
-      'user',
-      'task',
-      'template'
-    );
-    $aliases = array();
 
-
-    // aliases defined by modules
-    foreach ($modules as $m) {
-      require_once("modules/t3tool-$m.phpsh");
-      $function = 't3tool_' . $m . '_cmdaliases';
-      if (function_exists($function)) {
-        $aliases = array_merge($aliases, $function());
-      }
-    }
-
-
-    // global aliases
-    $filename = PATH_script . 'includes/aliases.php';
-    if (file_exists($filename)) {
-      $aliases = array_merge($aliases, include($filename));
-    }
-
-    // aliases defined by user
-    $user = posix_getpwuid(posix_getuid());
-    $filename = $user['dir'] . '/.t3tool/aliases.php';
-    if (file_exists($filename)) {
-      include($filename);
-    }
-
-    if (isset($aliases[$module])) {
-      if (is_array($aliases[$module])) {
+    if (isset($GLOBALS['aliases'][$module])) {
+      if (is_array($GLOBALS['aliases'][$module])) {
         // run commmands
-        foreach ($aliases[$module]['commands'] as $str) {
+        foreach ($GLOBALS['aliases'][$module]['commands'] as $str) {
           foreach ($args as $k => $v) {
             $str = str_replace('$' . $k, $v, $str);
           }
@@ -243,7 +209,7 @@
         }
 
       } else {
-        $args = explode(' ', str_replace($module, $aliases[$module], implode(' ', $args)));
+        $args = explode(' ', str_replace($module, $GLOBALS['aliases'][$module], implode(' ', $args)));
         t3tool_handlecmd($args);
 
         return;
@@ -252,15 +218,16 @@
 
     // handle help function
     if ($module == 'help') {
+      $out = '';
       if ($argv[0]) {
         $m = $argv[0];
         $function = 't3tool_' . $m . '_usage_long';
         if (function_exists($function)) {
-          $out = $function() . "\n";
+          $out .= $function() . "\n";
         }
       } else {
-        $out = "Usage:\n";
-        foreach ($modules as $m) {
+        $out .= "Usage:\n";
+        foreach ($GLOBALS['modules'] as $m) {
           $function = 't3tool_' . $m . '_usage_short';
           if (function_exists($function)) {
             $out .= $function() . "\n";
@@ -268,8 +235,8 @@
 
         }
       }
-      echo $out;
-      return;
+
+      return $out;
 
       /**
        * Flags are :
@@ -285,10 +252,10 @@
     }
 
     // dispatch command and arguments to module
-    if (in_array($module, $modules)) {
+    if (in_array($module, $GLOBALS['modules'])) {
       $function = 't3tool_' . $module . '_handlecmd';
       if (function_exists($function)) {
-        $function($argv, $level + 1);
+        return $function($argv, $level + 1);
       }
 
     } else {
@@ -350,7 +317,6 @@
     }
 
     global $TYPO3_CONF_VARS;
-    echo "Connecting to database... ";
 
     $db = $TYPO3_CONF_VARS['DB'];
     $typo_db_host = $db['host'];
@@ -375,8 +341,6 @@
     }
 
     $GLOBALS['DBIsInited'] = TRUE;
-
-    echo "ok.\n";
 
     return TRUE;
 
@@ -489,6 +453,23 @@
   }
 
   /**
+   * @param $sql
+   *
+   * @return array
+   */
+  function sql_get_column($sql) {
+    $rows = sql_get_rows($sql);
+    if ($rows) {
+      foreach ($rows as $row) {
+        $temp = each($row);
+        $column[] = $temp['value'];
+      }
+    }
+
+    return $column;
+  }
+
+  /**
    * Puts all rows in the correct place in the page tree and output the result.
    *
    * @param array $rows
@@ -560,14 +541,14 @@
    *
    * @return string something like "TYPO3/Welcome/About..."
    */
-  function getFormattedRootline($pid) {
+  function getFormattedRootline($pid, $crop = TRUE) {
     $a = array();
     pa($pid, $a);
     foreach ($a as $page) {
-      $titles[] = $page['title'];
+      $titles[] = $crop ? crop($page['title'], 15) : $page['title'];
     }
 
-    return implode(' / ', array_reverse($titles));
+    return implode('/', array_reverse($titles));
   }
 
   /**
@@ -911,12 +892,55 @@
    * @param array $a
    */
   function sendAsFlatTableWithPaths(array $a) {
-    foreach ($a as $i => $row) {
-      if ($row['pid']) {
-        $a[$i]['path'] = getFormattedRootline($row['pid']);
+    $l = array();
+    if (!sizeof($a)) {
+      echo "No records\n";
+
+      return;
+    }
+    $cols = array_keys($a[0]);
+    $footer[$cols[0]] = count($a);
+
+    foreach ($a as $y => $row) {
+      foreach ($row as $x => $d) {
+        $a[$y][$x] = objectToString($a[$y][$x]);
       }
     }
-    sendAsFlatTable($a);
+    foreach ($a as $y => $row) {
+      foreach ($row as $x => $d) {
+        $h[$x] = $x;
+        $l[$x] = max($l[$x], strlen($d));
+        $l[$x] = max($l[$x], strlen($x));
+      }
+    }
+
+    foreach ($a as $y => $row) {
+      foreach ($row as $x => $d) {
+        $a[$y][$x] = str_pad($d, $l[$x]);
+        $h[$x] = str_pad($h[$x], $l[$x]);
+        $footer[$x] = str_pad($footer[$x], $l[$x]);
+        $b[$x] = str_pad('', $l[$x], '-');
+      }
+    }
+
+    foreach ($a as $y => $row) {
+      $sorted[$row['pid']][] = $row;
+    }
+
+
+    echo "+-" . implode('-+-', $b) . "-+\n";
+    echo "| " . implode(' | ', $h) . " |\n";
+    echo "+-" . implode('-+-', $b) . "-+\n";
+    foreach ($sorted as $pid => $a) {
+      echo "| " . str_pad('- ' . getFormattedRootline($pid, FALSE) . ' :', array_sum($l) + 3 * (sizeof($l) - 1)) . " |\n";
+      foreach ($a as $y => $row) {
+        echo '| ';
+        echo implode(' | ', $row) . " |\n";
+      }
+    }
+    echo "+-" . implode('-+-', $b) . "-+\n";
+    echo "| " . implode(' | ', $footer) . " |\n";
+    echo "+-" . implode('-+-', $b) . "-+\n";
   }
 
   /**

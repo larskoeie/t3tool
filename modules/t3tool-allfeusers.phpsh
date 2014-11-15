@@ -94,3 +94,13 @@ output_ok();
   ");
 
   }
+
+  /**
+   * @return array
+   */
+  function t3tool_allfeusers_completion () {
+    return array(
+
+    );
+
+  }

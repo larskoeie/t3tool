@@ -67,3 +67,16 @@ function t3tool_alldomains_usage_short () {
   t3tool alldomains disable - Disable all domains.
     ");
 }
+
+  /**
+   * @return array
+   */
+  function t3tool_alldomains_completion () {
+    return array(
+      'alldomains' => array(
+        'enable' => 1,
+        'disable' => 1,
+      ),
+    );
+
+  }
