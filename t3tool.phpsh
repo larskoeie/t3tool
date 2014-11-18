@@ -89,7 +89,7 @@
   if (!is_dir('typo3conf')) {
     die('TYPO3 not found');
   }
-  
+
   readData();
 
 
@@ -130,7 +130,7 @@
         $funcs = explode(',', $t[$arg]);
         $func = trim($funcs[sizeof($args) - $n - 1]);
         if (function_exists($func)) {
-          return implode(' ', $func());
+          return implode(' ', call_user_func($func, $current, $comp_line));
         }
       }
       $t = $t[$arg];
@@ -302,10 +302,9 @@
 
     // realurl ?
     if (isset($GLOBALS['TYPO3_CONF_VARS']['EXT']['extConf']['realurl'])) {
-      $GLOBALS['realurl']['config'] = unserialize($GLOBALS['TYPO3_CONF_VARS']['EXT']['extConf']['realurl']);
-      if (isset($config['configFile'])) {
-        $GLOBALS['realurlConfigFile'] = $GLOBALS['realurl']['config']['configFile'];
-        require_once(PATH_site . $GLOBALS['realurl']['config']['configFile']);
+      $temp = unserialize($GLOBALS['TYPO3_CONF_VARS']['EXT']['extConf']['realurl']);
+      if (isset($temp['configFile'])) {
+        require_once(PATH_site . $temp['configFile']);
       }
     }
 
@@ -544,6 +543,7 @@
   function getFormattedRootline($pid, $crop = TRUE) {
     $a = array();
     pa($pid, $a);
+    $a = array_slice($a, 0, 5);
     foreach ($a as $page) {
       $titles[] = $crop ? crop($page['title'], 15) : $page['title'];
     }
@@ -891,7 +891,7 @@
   /**
    * @param array $a
    */
-  function sendAsFlatTableWithPaths(array $a) {
+  function sendAsFlatTable(array $a) {
     $l = array();
     if (!sizeof($a)) {
       echo "No records\n";
@@ -932,7 +932,7 @@
     echo "| " . implode(' | ', $h) . " |\n";
     echo "+-" . implode('-+-', $b) . "-+\n";
     foreach ($sorted as $pid => $a) {
-      echo "| " . str_pad('- ' . getFormattedRootline($pid, FALSE) . ' :', array_sum($l) + 3 * (sizeof($l) - 1)) . " |\n";
+      echo "| " . str_pad('- ' . getFormattedRootline($pid, TRUE) . ' :', array_sum($l) + 3 * (sizeof($l) - 1)) . " |\n";
       foreach ($a as $y => $row) {
         echo '| ';
         echo implode(' | ', $row) . " |\n";
@@ -957,7 +957,7 @@
    *
    * @param array $a
    */
-  function sendAsFlatTable(array $a) {
+  function sendAsFlatTableWithoutPaths(array $a) {
     $l = array();
     if (!sizeof($a)) {
       echo "No records\n";
@@ -1288,6 +1288,18 @@
     echo "\x1b[1;31m$out\x1b[0m\n";
     $GLOBALS['pos'] = 0;
     output_sendinfo($level + 1);
+  }
+
+
+  function t3tool_core_completion_tables() {
+    $tables = array('all');
+    $rows = sql_get_rows('show tables');
+    foreach ($rows as $row) {
+      $temp = each($row);
+      $tables[] = $temp['value'];
+    }
+
+    return $tables;
   }
 
 

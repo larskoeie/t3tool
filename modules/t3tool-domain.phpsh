@@ -32,13 +32,13 @@
         order by sys_domain.hidden asc, sys_domain.pid asc, sys_domain.sorting asc"
         );
 
-        if ($realurl_configured) {
+        if (isset($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['realurl'])) {
           foreach ($domains as $i => $domain) {
-            if (isset($GLOBALS['TYPO3_CONF_VARS']['EXTCONF'][$domain['domainName']])) {
-              if ($GLOBALS['TYPO3_CONF_VARS']['EXTCONF'][$domain['domainName']]['pagePath']['rootpage_id'] == $domain['pid']) {
+            if (isset($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['realurl'][$domain['domainName']])) {
+              if ($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['realurl'][$domain['domainName']]['pagePath']['rootpage_id'] == $domain['pid']) {
                 $domains[$i]['realurl'] = 'OK';
               } else {
-                $domains[$i]['realurl'] = 'On pid ' . $realurl_config[$domain['domainName']]['pagePath']['rootpage_id'];
+                $domains[$i]['realurl'] = 'On pid ' . $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['realurl'][$domain['domainName']]['pagePath']['rootpage_id'];
               }
             } else {
               $domains[$i]['realurl'] = 'Not configured';
@@ -46,7 +46,7 @@
           }
         }
         if ($cmd == 'list') {
-          sendAsFlatTableWithPaths($domains);
+          sendAsFlatTable($domains);
         }
         if ($cmd == 'find') {
           showRecordsInPageTree($domains);
@@ -88,7 +88,7 @@
           }
 
         }
-        sendAsFlatTableWithPaths($domains);
+        sendAsFlatTable($domains);
         break;
 
       //
@@ -346,6 +346,8 @@
     return array(
       'domain' => array(
         'add' => 1,
+        'add-record' => 1,
+        'add-realurl' => 1,
         'check' => 1,
         'delete' => 't3tool_domain_completion_domains',
         'disable' => 't3tool_domain_completion_domains_enabled',

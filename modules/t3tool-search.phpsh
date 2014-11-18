@@ -95,10 +95,6 @@
    */
   function t3tool_search_completion () {
     return array(
-      'search' => array(
-        'pages' => 1,
-        'tt_content' => 1
-      ),
+      'search' => 't3tool_core_completion_tables',
     );
-
   }

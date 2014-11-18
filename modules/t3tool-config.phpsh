@@ -23,10 +23,10 @@
       // set if exists
       case 'change' :
 
-      // set if NOT exists
+        // set if NOT exists
       case 'add' :
 
-      // just set
+        // just set
       case 'set' :
         if ($cmd == 'add' && $exists) {
           output_fail("Already exists. Use 'set' or 'change'.");
@@ -36,7 +36,7 @@
         }
         $value = $args[1];
         if (!strlen(trim($value))) {
-          return  ("Usage:
+          return ("Usage:
           t3tool config add path value
             Will set value if it does not exist.
           t3tool config change path value
@@ -64,19 +64,48 @@
     );
   }
 
-  function t3tool_config_usage_short () {
+  function t3tool_config_usage_short() {
     return ("Configuration commands:
   t3tool config get - Get all TYPO3_CONF_VARS or part of it
-        ");
+    ");
 
   }
 
   /**
    * @return array
    */
-  function t3tool_config_completion () {
+  function t3tool_config_completion() {
     return array(
-
+      'config' => array(
+        'get' => 't3tool_config_completion_config',
+      ),
     );
+
+  }
+
+  /**
+   * @param $current
+   * @param $comp_line
+   */
+  function t3tool_config_completion_config($current, $comp_line) {
+    $args = explode(' ', trim($comp_line, ' .'));
+    array_shift($args);
+    if ($current == $args[sizeof($args) - 1]) {
+      array_pop($args);
+    }
+//    print_R(get_defined_vars());
+    $t = $GLOBALS['TYPO3_CONF_VARS'];
+    if (trim($args[2])) {
+      foreach (explode('.', $args[2]) as $part) {
+        if (isset($t[$part])) {
+          $t = $t[$part];
+        }
+      }
+    }
+
+    foreach ($t as $key => $dummy) {
+      $hits[] = $prefix . $key;
+    }
+    return $hits;
 
   }

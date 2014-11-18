@@ -23,7 +23,6 @@
    */
   function t3tool_show_completion () {
     return array(
-
+      'show' => 't3tool_core_completion_tables',
     );
-
   }
