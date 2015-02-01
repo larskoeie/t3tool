@@ -40,10 +40,10 @@ function t3tool_plugin_handlecmd($args) {
       $plugins = sql_get_rows($sql);
 
       if ($cmd == 'list') {
-        sendAsFlatTable($plugins);
+        return sendAsFlatTable($plugins);
       }
       if ($cmd == 'find') {
-        showRecordsInPageTree($plugins);
+        return showRecordsInPageTree($plugins);
       }
 
 
@@ -68,7 +68,7 @@ function t3tool_plugin_handlecmd($args) {
 
       $plugins = sql_get_rows($sql);
 
-      sendAsFlatTable($plugins);
+      return sendAsFlatTable($plugins);
       break;
 
   }

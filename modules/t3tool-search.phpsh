@@ -1,61 +1,68 @@
 <?php
-  /**
-   * t3tool-search.phpsh
-   *
-   * Handles the command "t3tool search ...".
-   *
-   * @package t3tool
-   * @author Lars Køie
-   *
-   */
+/**
+ * t3tool-search.phpsh
+ *
+ * Handles the command "t3tool search ...".
+ *
+ * @package t3tool
+ * @author Lars Køie
+ *
+ */
 
-  /**
-   * @param $args
-   *
-   */
-  function t3tool_search_handlecmd($args) {
-    global $label;
+/**
+ * @param $args
+ *
+ */
+function t3tool_search_handlecmd($args) {
+	global $label;
 
-    $q = $args[0];
+	if ($args[0] == 'all') {
+		$tables = array_keys($GLOBALS['TCA']);
+	} else {
+		$tables = explode(',', $args[0]);
+	}
 
-    if (isset($label[$table])) {
-      $lab = $label[$table];
-    } else {
-      $lab = 'uid';
-    }
+	$q = $args[1];
 
-    if (!$q) {
-      return("Search commands:
+	if (isset($label[$table])) {
+		$lab = $label[$table];
+	} else {
+		$lab = 'uid';
+	}
+
+	if (!$q) {
+		return ("Search commands:
   t3tool search <string>
     Will search tables.
     ");
-    }
+	}
 
 
-    foreach ($GLOBALS['TCA'] as $table => $table_conf) {
-      if (!isset($table_conf['ctrl']['searchFields'])) {
-        continue;
-      }
-      $or = '';
-      $select = '';
+	foreach ($tables as $table) {
+		$table_conf = $GLOBALS['TCA'][$table];
+		if (!isset($table_conf['ctrl']['searchFields'])) {
+			continue;
+		}
+		$or = '';
+		$select = '';
 
-      $search_fields = explode(',', $table_conf['ctrl']['searchFields']);
+		$search_fields = explode(',', $table_conf['ctrl']['searchFields']);
 
-      $or = "(t.uid='$q'";
-      if (isset($search_fields)) {
-        foreach ($search_fields as $field) {
-          $field = trim($field);
-          if (!$field) {
-            continue;
-          }
-          $or .= ' or t.' . $field . ' like "%' . $q . '%"';
-          $select .= ',t.' . $field;
-        }
-      }
-      $or .= ')';
-      $where = ' and ' . $or;
+		$or = "(t.uid='$q'";
+		if (isset($search_fields)) {
+			foreach ($search_fields as $field) {
+				$field = trim($field);
+				if (!$field) {
+					continue;
+				}
+				$or .= ' or t.' . $field . ' like "%' . $q . '%"';
+				$select .= ',t.' . $field;
+			}
+		}
+		$or .= ')';
+		$where = ' and ' . $or;
 
-      $sql = "
+		$sql = "
     select SQL_CALC_FOUND_ROWS t.$lab as title, t.uid, t.pid,
     '$table' as _table  $select
     from $table as t 
@@ -65,36 +72,36 @@
     limit 10
     ";
 
-      $rows = sql_get_rows($sql);
-      if (sizeof($rows)) {
-        $total = sql_get_row('select found_rows() as total');
-        $total = $total['total'];
-        echo "\n" . $table . ' : ' . $total . ' rows' . "\n";
+		$rows = sql_get_rows($sql);
+		if (sizeof($rows)) {
+			$total = sql_get_row('select found_rows() as total');
+			$total = $total['total'];
+			echo "\n" . $table . ' : ' . $total . ' rows' . "\n";
 
 
-        foreach ($rows as $i => $row) {
-          $rows[$i]['_match'] = cropAndHilite($row['config'], $q);
-          $rows[$i]['_table'] = $table;
+			foreach ($rows as $i => $row) {
+				$rows[$i]['_match'] = cropAndHilite($row['config'], $q);
+				$rows[$i]['_table'] = $table;
 
-        }
-        sendAsFlatTable($rows);
-      }
-    }
+			}
+			return sendAsFlatTable($rows);
+		}
+	}
 
-  }
+}
 
-  function t3tool_search_usage_short () {
-    return("Search commands:
+function t3tool_search_usage_short() {
+	return ("Search commands:
   t3tool search - Search in tables.
     ");
 
-  }
+}
 
-  /**
-   * @return array
-   */
-  function t3tool_search_completion () {
-    return array(
-      'search' => 't3tool_core_completion_tables',
-    );
-  }
+/**
+ * @return array
+ */
+function t3tool_search_completion() {
+	return array(
+		'search' => 't3tool_core_completion_tables',
+	);
+}

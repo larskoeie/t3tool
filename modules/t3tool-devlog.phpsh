@@ -30,7 +30,7 @@
           $items[$i]['crdate'] = strftime('%d.%m.%Y %H.%M', $items[$i]['crdate']);
         }
 
-        sendAsFlatTable($items);
+        return sendAsFlatTable($items);
         break;
 
       //
@@ -43,7 +43,7 @@
           return ("No matching items.\n");
         }
 
-        sendRecordAsTable($record);
+        return sendRecordAsTable($record);
         break;
 
       case 'tail' :
@@ -67,7 +67,10 @@
    */
   function t3tool_devlog_completion () {
     return array(
-
+        'devlog' => array(
+            'list' => 1,
+            'tail' => 1,
+        )
     );
 
   }

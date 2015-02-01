@@ -17,7 +17,7 @@ switch ($cmd) {
   #   
   case 'list' :
     $records = sql_get_rows ("select uid, pid, name from sys_file order by uid asc");
-    sendAsFlatTable($records);
+    return sendAsFlatTable($records);
     break;	
 
   #  
@@ -31,7 +31,7 @@ switch ($cmd) {
     if (! $record)
     	return("File not found.\n");
     	
-    sendRecordAsTable($record);
+    return sendRecordAsTable($record);
     break;	
 
 

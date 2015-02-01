@@ -14,7 +14,7 @@
       return ("t3tool show [table] [uid]\n");
     }
     $record = getSingleRecordByString($table, $uid);
-    sendRecordAsTable($record);
+    return sendRecordAsTable($record);
 
   }
 

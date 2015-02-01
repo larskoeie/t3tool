@@ -31,7 +31,7 @@
         if (!$records) {
           return;
         }
-        sendAsFlatTable($records);
+        return sendAsFlatTable($records);
 
         break;
 

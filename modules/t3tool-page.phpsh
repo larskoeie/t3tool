@@ -29,7 +29,7 @@
           return("Usage : t3tool page show <title or uid>. Case insensitive.\n");
         }
         $page = getSingleRecordByString('pages', $title, array('title'));
-        sendRecordAsTable($page);
+        return sendRecordAsTable($page);
         break;
 
       //
@@ -94,13 +94,13 @@
       //
       case 'rootline' :
         $a = array();
-        if (!$argv[2]) {
+        if (!$args[0]) {
           return("Usage : t3tool rootline <uid or page-title>\n  Show the rootline of page\n");
         }
         $res = sql_query('select title, uid, pid, deleted, hidden from pages where uid=' . intval($args[0]) . ' or title like "' . $args[0] . '"');
-        while ($row = sql_fetch_array($res)) {
+        if ($row = sql_fetch_array($res)) {
           $a = getRootline($row['uid']);
-          sendAsFlatTable($a, TRUE);
+          return sendAsFlatTable($a, TRUE);
         }
         break;
 

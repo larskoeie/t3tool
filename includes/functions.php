@@ -94,7 +94,7 @@ function t3tool_handlecmd($argv, $level = 0)
 
 function buildTCA()
 {
-    $tca = include('includes/tca-core-6-1.php');
+    $tca = include(PATH_script . 'includes/tca-core-6-1.php');
     $tca_t3tool = array();
     if (file_exists('includes/tca-t3tool.php')) {
         $tca_t3tool = include('includes/tca-t3tool.php');
@@ -173,8 +173,9 @@ function initDB()
         list(,$table) = each($temp2);
         $db_tables[$table] = TRUE;
     }
-    $GLOBALS['TCA'] = array_intersect_key($GLOBALS['TCA'], $db_tables);
-
+    if (is_array($GLOBALS['TCA'])) {
+        $GLOBALS['TCA'] = array_intersect_key($GLOBALS['TCA'], $db_tables);
+    }
 
 
     return TRUE;
@@ -343,7 +344,7 @@ function showRecordsInPageTree(array $rows, $table = '')
     pt($result);
     $b = array();
     //flattenArray($result, $b);
-    sendAsTable($result);
+    return sendAsTable($result);
 }
 
 /**
@@ -390,6 +391,7 @@ function getPidList($pid, $depth = 100)
 function getFormattedRootline($pid, $crop = TRUE)
 {
     $a = array();
+    $titles = array();
     pa($pid, $a);
     $a = array_slice($a, 0, 5);
     foreach ($a as $page) {
@@ -578,6 +580,7 @@ function getRecordsByString($table, $q = '', $fields = array(), $selectFields = 
         if (strpos($q, '!') !== FALSE) {
             if (preg_match(';^\!\((.*)\)$;', $q, $m)) {
                 $q = $m[1];
+
                 $and = " $table.uid!='$q'";
                 foreach ($fields as $field) {
                     $and .= " and $table.$field not like '$q'";
@@ -590,7 +593,12 @@ function getRecordsByString($table, $q = '', $fields = array(), $selectFields = 
                 return array();
             }
         } else {
-            $or = " $table.uid='$q'";
+            $or = '0';
+            if (is_array($GLOBALS['TCA'][$table])) {
+                $or .= " or $table.uid='$q'";
+
+            }
+
             foreach ($fields as $field) {
                 $or .= " or $table.$field like '$q'";
             }
@@ -694,13 +702,14 @@ function sendRecordAsTable(array $a)
         $values[$k] = str_pad($values[$k], $l[1]);
     }
 
-    echo "+-" . implode('-+-', $b) . "-+\n";
+    $out .= "+-" . implode('-+-', $b) . "-+\n";
     foreach ($keys as $k => $v) {
-        echo '| ';
-        echo $keys[$k] . " | ";
-        echo $values[$k] . " |\n";
+        $out .= '| ';
+        $out .= $keys[$k] . " | ";
+        $out .= $values[$k] . " |\n";
     }
-    echo "+-" . implode('-+-', $b) . "-+\n";
+    $out .= "+-" . implode('-+-', $b) . "-+\n";
+    return $out;
 
 }
 
@@ -714,6 +723,9 @@ function sendRecordAsTable(array $a)
  */
 function crop($s, $l = 50)
 {
+    if (getFlag('f')) {
+        return $s;
+    }
     return substr($s, 0, $l) . (strlen($s) > $l ? ' ...' : '');
 }
 
@@ -742,11 +754,11 @@ function objectToString($s)
  */
 function sendAsFlatTable(array $a)
 {
+    $return = '';
+
     $l = array();
     if (!sizeof($a)) {
-        echo "No records\n";
-
-        return;
+        return "No records\n";
     }
     $cols = array_keys($a[0]);
     $footer[$cols[0]] = count($a);
@@ -778,21 +790,23 @@ function sendAsFlatTable(array $a)
     }
 
 
-    echo "+-" . implode('-+-', $b) . "-+\n";
-    echo "| " . implode(' | ', $h) . " |\n";
-    echo "+-" . implode('-+-', $b) . "-+\n";
+    $return .= "+-" . implode('-+-', $b) . "-+\n";
+    $return .= "| " . implode(' | ', $h) . " |\n";
+    $return .= "+-" . implode('-+-', $b) . "-+\n";
     foreach ($sorted as $pid => $a) {
         if ($pid) {
-            echo "| " . str_pad('- ' . getFormattedRootline($pid, TRUE) . ' :', array_sum($l) + 3 * (sizeof($l) - 1)) . " |\n";
+            $return .= "| " . str_pad('- ' . getFormattedRootline($pid, TRUE) . ' :', array_sum($l) + 3 * (sizeof($l) - 1)) . " |\n";
         }
         foreach ($a as $y => $row) {
-            echo '| ';
-            echo implode(' | ', $row) . " |\n";
+            $return .= '| ';
+            $return .= implode(' | ', $row) . " |\n";
         }
     }
-    echo "+-" . implode('-+-', $b) . "-+\n";
-    echo "| " . implode(' | ', $footer) . " |\n";
-    echo "+-" . implode('-+-', $b) . "-+\n";
+    $return .= "+-" . implode('-+-', $b) . "-+\n";
+    $return .= "| " . implode(' | ', $footer) . " |\n";
+    $return .= "+-" . implode('-+-', $b) . "-+\n";
+
+    return $return;
 }
 
 /**
@@ -814,9 +828,9 @@ function sendAsFlatTableWithoutPaths(array $a)
 {
     $l = array();
     if (!sizeof($a)) {
-        echo "No records\n";
+        $out .= "No records\n";
 
-        return;
+        return $out;
     }
     $cols = array_keys($a[0]);
     $footer[$cols[0]] = count($a);
@@ -842,16 +856,18 @@ function sendAsFlatTableWithoutPaths(array $a)
             $b[$x] = str_pad('', $l[$x], '-');
         }
     }
-    echo "+-" . implode('-+-', $b) . "-+\n";
-    echo "| " . implode(' | ', $h) . " |\n";
-    echo "+-" . implode('-+-', $b) . "-+\n";
+    $out .= "+-" . implode('-+-', $b) . "-+\n";
+    $out .= "| " . implode(' | ', $h) . " |\n";
+    $out .= "+-" . implode('-+-', $b) . "-+\n";
     foreach ($a as $y => $row) {
-        echo '| ';
-        echo implode(' | ', $row) . " |\n";
+        $out .= '| ';
+        $out .= implode(' | ', $row) . " |\n";
     }
-    echo "+-" . implode('-+-', $b) . "-+\n";
-    echo "| " . implode(' | ', $footer) . " |\n";
-    echo "+-" . implode('-+-', $b) . "-+\n";
+    $out .= "+-" . implode('-+-', $b) . "-+\n";
+    $out .= "| " . implode(' | ', $footer) . " |\n";
+    $out .= "+-" . implode('-+-', $b) . "-+\n";
+
+    return $out;
 }
 
 /**
@@ -931,7 +947,7 @@ function sendAsTable(array $a, $depth = 0)
 
         if (isset($row['_'])) {
             foreach ($row['_'] as $table => $records) {
-                sendAsTable($records, $depth + 1);
+                return sendAsTable($records, $depth + 1);
             }
         }
     }
@@ -1109,8 +1125,14 @@ function sql_tail($sql)
 
 }
 
+function enable_output () {
+    $GLOBALS['output'] = TRUE;
+}
+    function disble_output () {
+        $GLOBALS['output'] = FALSE;
+    }
 
-function output_info($s, $level = 0)
+    function output_info($s, $level = 0)
 {
     $GLOBALS['info'][] = $s;
 }
@@ -1123,13 +1145,13 @@ function output_sendinfo($level)
 /**
  * @param $s
  */
-function output_cmd($s, $level = 0, $vars = array())
+function output_cmd($s, $level = 0)
 {
     if ($GLOBALS['pos'] > 0) {
         echo "\n";
     }
     $out = $s . '... ';
-    echo str_replace(array_keys($vars), array_values($vars), $out);
+    echo $out;
     $GLOBALS['pos'] = strlen($out);
 }
 
@@ -1172,3 +1194,80 @@ function t3tool_core_completion_tables()
 
     return $tables;
 }
+
+function t3tool_core_completion_pages()
+{
+    // only magic pages for now
+    return array('FIRSTROOT');
+}
+
+
+
+    /**
+     * @param $current
+     * @param $comp_line
+     *
+     * @return string
+     *
+     * TODO: Does not work when command contains options ("-p" , "--recursive")
+     */
+    function getTabCompleteString($current, $comp_line) {
+        $args = explode(' ', trim($comp_line));
+        array_shift($args);
+
+        if ($current == $args[sizeof($args) - 1]) {
+            array_pop($args);
+        }
+        $t = $GLOBALS['commands'];
+        foreach ($args as $n => $arg) {
+            if (!isset($t[$arg])) {
+                return '';
+            }
+            if (is_string($t[$arg])) {
+                $funcs = explode(',', $t[$arg]);
+                $func = trim($funcs[sizeof($args) - $n - 1]);
+                if (function_exists($func)) {
+                    return implode(' ', call_user_func($func, $current, $comp_line));
+                }
+            }
+            $t = $t[$arg];
+        }
+        if (is_array($t)) {
+            return implode(' ', array_keys($t));
+        }
+
+        return '';
+    }
+
+    /**
+     * @param $prompt
+     */
+    function readPassword() {
+        $pw1 = readline('Enter password : ', TRUE);
+        $pw2 = readline('Enter password again : ', TRUE);
+        if ($pw1 == $pw2) {
+            return $pw1;
+        }
+        echo "Passwords do not match.";
+
+        return FALSE;
+    }
+
+    /**
+     *
+     */
+    if (!function_exists('readline')) {
+        function readline($prompt = '', $pw = FALSE) {
+            echo $prompt;
+            if ($pw) {
+                system('stty -echo');
+            }
+            $s = rtrim(fgets(STDIN), "\n");
+            if ($pw) {
+                system('stty echo');
+                echo "\n";
+            }
+
+            return $s;
+        }
+    }

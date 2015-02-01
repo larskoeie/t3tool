@@ -39,7 +39,7 @@
             unset($tasks[$i]['serialized_task_object']);
           }
         }
-        sendAsFlatTable($tasks);
+        return sendAsFlatTable($tasks);
         break;
 
       //
@@ -59,7 +59,7 @@
         }
 
 
-        sendRecordAsTable($task);
+        return sendRecordAsTable($task);
         print_r($arr);
         break;
 

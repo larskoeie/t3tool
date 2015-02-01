@@ -51,7 +51,7 @@
         foreach ($items as $i => $item) {
           $items[$i]['tstamp'] = strftime('%d.%m.%Y %H.%M', $item['tstamp']);
         }
-        sendAsFlatTable($items);
+        return sendAsFlatTable($items);
 
         break;
 

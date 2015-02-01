@@ -29,7 +29,7 @@ function t3tool_sqlq_handlecmd($args) {
     return('OK - ' . $updated . " affected rows.\n");
   }
 
-  sendAsFlatTable($result);
+  return sendAsFlatTable($result);
 
 }
 

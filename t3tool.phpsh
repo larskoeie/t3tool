@@ -1,184 +1,23 @@
 #!/usr/bin/env php
 <?php
-/**
- *
- * Should be called from t3tool
- * path should be TYPO3 root dir (PATH_site)
- *
- *
- */
+    /**
+     *
+     * Should be called from t3tool
+     * path should be TYPO3 root dir (PATH_site)
+     *
+     *
+     */
 
-require_once('init.php');
-
-
-$GLOBALS['modules'] = array(
-    'cc',
-    'config',
-    'db',
-    'deprecation',
-    'devlog',
-    'domain',
-    'ext',
-    'feuser',
-    'history',
-    'log',
-    'page',
-    'plugin',
-    'registry',
-    'search',
-    'show',
-    'sqlq',
-    'user',
-    'task',
-    'template'
-);
-
-// require all modules
-foreach ($GLOBALS['modules'] as $m) {
-    require_once("modules/t3tool-$m.phpsh");
-}
-
-// build command map for bash completion
-// aliases defined by modules
-$GLOBALS['commands'] = array();
-foreach ($GLOBALS['modules'] as $m) {
-    $function = 't3tool_' . $m . '_completion';
-    if (function_exists($function)) {
-        $GLOBALS['commands'] = array_merge($GLOBALS['commands'], $function());
-    }
-}
-
-$aliases = array();
-
-// build aliases
-// aliases defined by modules
-foreach ($GLOBALS['modules'] as $m) {
-    $function = 't3tool_' . $m . '_cmdaliases';
-    if (function_exists($function)) {
-        $GLOBALS['aliases'] = array_merge($GLOBALS['aliases'], $function());
-    }
-}
-
-// global aliases
-$filename = PATH_script . 'includes/aliases.php';
-if (file_exists($filename)) {
-    $GLOBALS['aliases'] = array_merge($GLOBALS['aliases'], include($filename));
-}
-
-// aliases defined by user
-$user = posix_getpwuid(posix_getuid());
-$filename = $user['dir'] . '/.t3tool/aliases.php';
-if (file_exists($filename)) {
-    include($filename);
-}
-
-while (!is_dir('typo3conf') && getcwd() != '/') {
-    chdir('..');
-}
-if (!is_dir('typo3conf')) {
-    die('TYPO3 not found');
-}
-
-readData();
+    require_once('init.php');
 
 
-$GLOBALS['version_4'] = is_file(PATH_typo3conf . 'localconf.php');
-$GLOBALS['version_6'] = is_file(PATH_typo3conf . 'LocalConfiguration.php');
 
-readConf();
+    $args = $argv;
 
-// if called from bash_completion, leave early
-if ($argv[1] == '_complete') {
-    die(getTabCompleteString($argv[2], $argv[3]));
-}
-
-buildTCA();
-
-
-/**
- * @param $current
- * @param $comp_line
- *
- * @return string
- *
- * TODO: Does not work when command contains options ("-p" , "--recursive")
- */
-function getTabCompleteString($current, $comp_line) {
-    $args = explode(' ', trim($comp_line));
+    // remove arg-0 which is path to script
     array_shift($args);
 
-    if ($current == $args[sizeof($args) - 1]) {
-        array_pop($args);
-    }
-    $t = $GLOBALS['commands'];
-    foreach ($args as $n => $arg) {
-        if (!isset($t[$arg])) {
-            return '';
-        }
-        if (is_string($t[$arg])) {
-            $funcs = explode(',', $t[$arg]);
-            $func = trim($funcs[sizeof($args) - $n - 1]);
-            if (function_exists($func)) {
-                return implode(' ', call_user_func($func, $current, $comp_line));
-            }
-        }
-        $t = $t[$arg];
-    }
-    if (is_array($t)) {
-        return implode(' ', array_keys($t));
-    }
-
-    return '';
-}
-
-/**
- * @param $prompt
- */
-function readPassword() {
-    $pw1 = readline('Enter password : ', TRUE);
-    $pw2 = readline('Enter password again : ', TRUE);
-    if ($pw1 == $pw2) {
-        return $pw1;
-    }
-    echo "Passwords do not match.";
-
-    return FALSE;
-}
-
-/**
- *
- */
-if (!function_exists('readline')) {
-    function readline($prompt = '', $pw = FALSE) {
-        echo $prompt;
-        if ($pw) {
-            system('stty -echo');
-        }
-        $s = rtrim(fgets(STDIN), "\n");
-        if ($pw) {
-            system('stty echo');
-            echo "\n";
-        }
-
-        return $s;
-    }
-}
-
-// part of TCA
-$label = array(
-    'pages' => 'title',
-    'sys_domain' => 'domainName',
-    'sys_template' => 'title',
-    'tt_content' => 'header',
-    'tt_news' => 'title',
-);
-
-$args = $argv;
-
-// remove arg-0 which is path to script
-array_shift($args);
-
-// handle command
-echo t3tool_handlecmd($args);
+    // handle command
+    echo t3tool_handlecmd($args);
 
 

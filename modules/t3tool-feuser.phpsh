@@ -21,10 +21,10 @@
       case 'find' :
         $feusers = getRecordsByString('fe_users', $username, array('username'), 'uid, pid, username, email, disable');
         if ($cmd == 'list') {
-          sendAsFlatTable($feusers);
+          return sendAsFlatTable($feusers);
         }
         if ($cmd == 'find') {
-          showRecordsInPageTree($feusers, 'fe_users');
+          return showRecordsInPageTree($feusers, 'fe_users');
         }
         break;
 
@@ -39,7 +39,7 @@
           ORDER BY c DESC
           LIMIT 0 , 30');
 
-        sendAsFlatTable($feusers);
+        return sendAsFlatTable($feusers);
 
         break;
 
@@ -88,7 +88,7 @@
           return("No matching groups.\n");
         }
 
-        sendAsFlatTable($groups);
+        return sendAsFlatTable($groups);
 
         break;
 
@@ -97,7 +97,7 @@
       //
       case 'showgroup' :
         $group = getSingleRecordByString('fe_groups', $args[0], array('title'));
-        sendRecordAsTable($group);
+        return sendRecordAsTable($group);
         break;
 
       //
@@ -108,7 +108,7 @@
         $users = sql_get_rows('select uid, disable, username, email
       from fe_users
       where find_in_set(' . $group['uid'] . ', usergroup)');
-        sendAsFlatTable($users);
+        return sendAsFlatTable($users);
         break;
 
       //
@@ -157,7 +157,7 @@
           'email'
         ));
 
-        sendRecordAsTable($user);
+        return sendRecordAsTable($user);
         break;
 
       //

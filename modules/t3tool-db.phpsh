@@ -1,40 +1,56 @@
 <?php
-  /**
-   * Created by PhpStorm.
-   * User: Lars
-   * Date: 28-08-14
-   * Time: 19:55
-   */
+/**
+ * Created by PhpStorm.
+ * User: Lars
+ * Date: 28-08-14
+ * Time: 19:55
+ */
 
 
-  function t3tool_data_handlecmd($args) {
-    $cmd = array_shift($args);
+function t3tool_db_handlecmd($args) {
+	$cmd = array_shift($args);
 
-    switch ($cmd) {
+	switch ($cmd) {
 
-      case 'export-table-as-array' :
-        $table = $args[0];
+		case 'login' :
+			echo sprintf('mysql -h%s -u%s -p%s %s',
+				$GLOBALS['TYPO3_CONF_VARS']['DB']['host'],
+				$GLOBALS['TYPO3_CONF_VARS']['DB']['username'],
+				$GLOBALS['TYPO3_CONF_VARS']['DB']['password'],
+				$GLOBALS['TYPO3_CONF_VARS']['DB']['database']
+			);
+			echo "\n";
+			break;
 
-        $rows = sql_get_rows("select * from $table order by uid");
-        foreach ($rows as $i => $row) {
-          unset($rows[$i]['uid']);
-          unset($rows[$i]['pid']);
-        }
-        echo '<?php $data=' . var_export($rows, 1). ';';
+
+		case 'export-table-as-array' :
+			$table = $args[0];
+
+			$rows = sql_get_rows("select * from $table order by uid");
+			foreach ($rows as $i => $row) {
+				unset($rows[$i]['uid']);
+				unset($rows[$i]['pid']);
+			}
+			echo '<?php $data=' . var_export($rows, 1) . ';';
 
 
-        break;
+			break;
 
-    }
+        case 'tail' :
+            $table = $args[0];
+            if (!trim($table)) {
+                return "Usage: t3tool tail <table>\n";
+            }
+            sql_tail('select uid from ' . $table . ' order by uid desc');
+            break;
+	}
 
-  }
+}
 
-  /**
-   * @return array
-   */
-  function t3tool_data_completion () {
-    return array(
+/**
+ * @return array
+ */
+function t3tool_db_completion() {
+	return array();
 
-    );
-
-  }
+}

@@ -9,6 +9,6 @@ _t3tool() {
     return 0
 }
 
-complete -o nospace -F _t3tool t3tool
+complete -F _t3tool t3tool
 
 

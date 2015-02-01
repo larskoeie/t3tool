@@ -32,7 +32,7 @@
           $items[$i]['details'] = vsprintf($item['details'], unserialize($item['log_data']));
           unset($items[$i]['log_data']);
         }
-        sendAsFlatTable($items);
+        return sendAsFlatTable($items);
         break;
 
       case 'tail' :

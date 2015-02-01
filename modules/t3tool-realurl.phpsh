@@ -1,0 +1,71 @@
+<?php
+/**
+ * t3tool-realurl.phpsh
+ *
+ * Handles the commands "t3tool realurl ...".
+ *
+ * @package t3tool
+ * @author Lars Køie
+ *
+ */
+
+/**
+ * @param $args
+ */
+function t3tool_realurl_handlecmd($args)
+{
+
+    $cmd = array_shift($args);
+    $q = strtolower($args[0]);
+
+    switch ($cmd) {
+
+
+        //
+        //
+        case 'search' :
+            $out .= "tx_realurl_pathcache :\n";
+            $records = getRecordsByString('tx_realurl_pathcache', $q, array('pagepath'));
+            $out .= sendAsFlatTableWithoutPaths($records);
+
+            $out .= "tx_realurl_redirects :\n";
+            $records = getRecordsByString('tx_realurl_redirects', $q, array('url', 'destination'));
+            $out .= sendAsFlatTableWithoutPaths($records);
+
+            $out .= "tx_realurl_urlencodecache :\n";
+            $records = getRecordsByString('tx_realurl_urlencodecache', $q, array('url_hash', 'content', 'page_id'));
+            $out .= sendAsFlatTableWithoutPaths($records);
+
+            $out .= "tx_realurl_urldecodecache :\n";
+            $records = getRecordsByString('tx_realurl_urldecodecache', $q, array('url_hash', 'spurl', 'page_id'));
+            $out .= sendAsFlatTableWithoutPaths($records);
+
+            return $out;
+            break;
+    }
+}
+
+
+
+function t3tool_realurl_cmdaliases() {
+    return array(
+    );
+}
+
+function t3tool_realurl_usage_short() {
+    return ('');
+
+}
+
+/**
+ * @return array
+ */
+function t3tool_realurl_completion() {
+    return array(
+        "realurl" => array(
+            'search' => '1',
+        ),
+
+    );
+
+}
