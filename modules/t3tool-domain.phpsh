@@ -188,7 +188,7 @@ function t3tool_domain_handlecmd($args)
                     output_info($domain['domainName'] . " already disabled.\n");;
                 }
 
-                output_cmd("Disabling " . $domain['domainName'] . "... ");
+                output_cmd("Disabling domain " . $domain['domainName'] . "... ");
                 sql_query("update sys_domain set hidden=1 where uid = " . $domain['uid']);
                 output_ok();
             }

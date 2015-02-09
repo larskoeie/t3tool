@@ -62,7 +62,7 @@ function t3tool_template_handlecmd($args)
             $pid = $args[2];
 
             if (!trim($pid)) {
-                return ("Usage : t3tool template set <key> <value> <pid> \n");
+                output_usage("Usage : t3tool template set <key> <value> <pid> \n");
             }
 
             $page = getSingleRecordByString('pages', $pid);
@@ -70,13 +70,42 @@ function t3tool_template_handlecmd($args)
 
             output_cmd("Setting '$key' to '$value' on page '" . $page['title'] . "'... ");
 
-            $line = "\n\n# Added by t3tool\n$key = $value\n";
+            $line = "\n$key = $value\n";
 
             sql_query("update sys_template set config=concat(config, '$line') where pid=$pid and not hidden order by sorting limit 1");
             if (!sql_affected_rows())
-                return ("No templates on page. Nothing done.\n");
-            echo "done.\n";
+                output_fail("No templates on page. Nothing done.");
+
+            output_ok();
             break;
+
+        #
+        # Set a TS value on a pid.
+        # TODO : find some way to move this to t3tool-ts.phpsh
+        #
+        case 'const-set' :
+            $key = $args[0];
+            $value = $args[1];
+            $pid = $args[2];
+
+            if (!trim($pid)) {
+                output_usage("Usage : t3tool template const-set <key> <value> <pid> \n");
+            }
+
+            $page = getSingleRecordByString('pages', $pid);
+            $pid = $page['uid'];
+
+            output_cmd("Setting '$key' to '$value' on page '" . $page['title'] . "'... ");
+
+            $line = "\n$key = $value\n";
+
+            sql_query("update sys_template set constants=concat(constants, '$line') where pid=$pid and not hidden order by sorting limit 1");
+            if (!sql_affected_rows())
+                output_fail("No templates on page. Nothing done.");
+
+            output_ok();
+            break;
+
 
         default :
             return ("  t3tool template list
@@ -116,6 +145,7 @@ function t3tool_template_completion()
             'find' => 1,
             'list' => 1,
             'set' => 1,
+            'const-set' => 1,
             'show' => 1
         ),
     );

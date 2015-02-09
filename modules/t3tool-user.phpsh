@@ -49,7 +49,7 @@ function t3tool_user_handlecmd($args) {
             sql_query("insert into be_users (username, password, admin) values ('$username', md5('$password'), 1)");
             output_ok('', $level);
 
-            return TRUE;
+            return '';
 
             break;
 
@@ -82,7 +82,7 @@ function t3tool_user_handlecmd($args) {
             sql_query("update be_users set password=md5('$password') where uid=" . $user['uid']);
             output_ok();
 
-            return TRUE;
+            return '';
             break;
 
         //
@@ -116,7 +116,7 @@ function t3tool_user_handlecmd($args) {
             if (!$groups) {
                 output_info("No matching groups.\n");
 
-                return TRUE;
+                return '';
             }
 
             return sendAsFlatTable($groups);
@@ -140,7 +140,7 @@ function t3tool_user_handlecmd($args) {
             sql_query("insert into be_groups (title) values ('$username')");
             output_ok('', $level);
 
-            return TRUE;
+            return '';
 
             break;
 
@@ -164,7 +164,7 @@ function t3tool_user_handlecmd($args) {
             if (!$users) {
                 output_info("No members.\n");
 
-                return TRUE;
+                return '';
             }
 
             return sendAsFlatTable($users);
@@ -182,7 +182,7 @@ function t3tool_user_handlecmd($args) {
             $groups = getRecordsByString('be_groups', $username, array('title'));
 
             foreach ($groups as $group) {
-                output_cmd(sprintf('Deleting user group "%s"', $group['title']));
+                output_cmd(sprintf('Deleting backend user group "%s"', $group['title']));
                 sql_query("delete from be_groups where uid =  " . $group['uid'] . " limit 1");
                 output_ok('', $level);
             }
@@ -202,7 +202,7 @@ function t3tool_user_handlecmd($args) {
                     if (!in_array($group['uid'], $hasgroups)) {
                         $hasgroups[] = $group['uid'];
                     }
-                    output_cmd(sprintf('Adding group %s to user %s', $group['title'], $user['username']), $level);
+                    output_cmd(sprintf('Adding group %s to backend user %s', $group['title'], $user['username']), $level);
                     sql_query('update be_users set usergroup="' . implode(',', $hasgroups) . '" where uid = ' . $user['uid']);
                     output_ok();
                 }
@@ -220,12 +220,12 @@ function t3tool_user_handlecmd($args) {
                 foreach ($groups as $group) {
                     unset($hasgroups[$group['uid']]);
 
-                    output_cmd('Removing group %s from user %s', $group['title'], $user['username']);
+                    output_cmd('Removing group %s from backend user %s', $group['title'], $user['username']);
                     sql_query('update be_users set usergroup="' . implode(',', array_keys($hasgroups)) . '" where uid = ' . $user['uid']);
                     output_ok('', $level);
                 }
             }
-            return TRUE;
+            return '';
             break;
 
         //
@@ -234,11 +234,11 @@ function t3tool_user_handlecmd($args) {
         case 'setadmin' :
             foreach ($users as $user) {
 
-                output_cmd('Setting user "' . $user['username'] . '" as admin', $level);
+                output_cmd('Setting backend user "' . $user['username'] . '" as admin', $level);
                 sql_query('update be_users set admin=1 where uid = ' . $user['uid']);
                 output_ok('', $level);
             }
-            return TRUE;
+            return '';
             break;
 
         //
@@ -246,11 +246,11 @@ function t3tool_user_handlecmd($args) {
         //
         case 'clradmin' :
             foreach ($users as $user) {
-                output_cmd('Setting user "' . $user['username'] . '" to non-admin"');
+                output_cmd('Setting backend user "' . $user['username'] . '" to non-admin"');
                 sql_query('update be_users set admin=0     where uid = ' . $user['uid']);
                 output_ok('', $level);
             }
-            return TRUE;
+            return '';
             break;
 
         //
@@ -264,12 +264,12 @@ function t3tool_user_handlecmd($args) {
             ), 'uid, username, email, disable, concat(substring(password, 1, 8), "...") as password');
 
             if (!$users) {
-                output_info("No matching users.\n");
+                output_info("No matching backend users.\n");
             } else {
                 return sendAsFlatTable($users);
             }
 
-            return TRUE;
+            return '';
             break;
 
         //
@@ -303,11 +303,11 @@ function t3tool_user_handlecmd($args) {
                     output_info($user['username'] . " already enabled.\n");
                 }
 
-                output_cmd("Enabling user " . $user['username']);
+                output_cmd("Enabling backend user " . $user['username']);
                 sql_query("update be_users set disable=0 where uid= " . $user['uid'] . " limit 1");
                 output_ok('', $level);
             }
-            return TRUE;
+            return '';
 
             break;
 
@@ -323,12 +323,12 @@ function t3tool_user_handlecmd($args) {
                 if ($user['disable'] == 1) {
                     output_info($user['username'] . " already disabled.\n");
                 }
-                output_cmd("Disabling user " . $user['username']);
+                output_cmd("Disabling backend user " . $user['username']);
 
                 sql_query("update be_users set disable=1 where uid =  " . $user['uid'] . " limit 1");
                 output_ok('', $level);
             }
-            return TRUE;
+            return '';
 
             break;
 
@@ -340,11 +340,11 @@ function t3tool_user_handlecmd($args) {
                 output_usage("Usage : t3tool user removeemail <username or uid>. Case insensitive.");
             }
             foreach ($users as $user) {
-                output_cmd("Removing email from user " . $user['username']);
+                output_cmd("Removing email from backend user " . $user['username']);
                 sql_query("update be_users set email='removed' where uid =  " . $user['uid'] . " limit 1");
                 output_ok('', $level);
             }
-            return TRUE;
+            return '';
 
             break;
 
@@ -360,7 +360,7 @@ function t3tool_user_handlecmd($args) {
 
             foreach ($users as $user) {
 
-                output_cmd('Deleting user "' . $user['username'] . '"');
+                output_cmd('Deleting backend user "' . $user['username'] . '"');
                 sql_query("delete from be_users where uid =  " . $user['uid'] . " limit 1");
                 output_ok('', $level);
             }
@@ -390,12 +390,12 @@ function t3tool_user_handlecmd($args) {
             }
 
             foreach ($users as $user) {
-                output_cmd('Kicking user "' . $user['username'] . '" off system');
+                output_cmd('Kicking backend user "' . $user['username'] . '" off system');
                 sql_query('delete from be_sessions where ses_userid=' . $user['uid']);
                 output_ok('', $level);
             }
 
-            return TRUE;
+            return '';
             break;
 
         default :

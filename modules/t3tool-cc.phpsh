@@ -48,6 +48,24 @@
         sql_query('truncate tx_realurl_chashcache');
         break;
 
+      case 'stat' :
+        $tables = sql_get_rows('show tables');
+        output_cmd("Showing tables prefixed 'cache_' or 'cf_'");
+        foreach ($tables as $table) {
+          $temp = each($table);
+          $table = $temp[1];
+          if (preg_match('/^(cache)|(cf)_/', $table)) {
+            $temp = sql_get_row("select count(*) as count from $table;");
+            $out[] = array(
+              'table' => $table,
+                'count' => $temp['count'],
+            );
+          }
+        }
+        return sendAsFlatTable($out);
+
+            break;
+
       default :
         return ("Clear cache commands:
   t3tool cc content - Truncates all cache tables.

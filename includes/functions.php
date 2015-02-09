@@ -1168,6 +1168,18 @@ function output_ok($s = '', $level = 0)
 }
 
 /**
+ *
+ */
+function output_usage($s = '', $level = 0)
+{
+    $out = $s;
+    echo "\x1b[1;32m$out\x1b[0m\n";
+    $GLOBALS['pos'] = 0;
+    output_sendinfo($level + 1);
+    exit;
+}
+
+/**
  * @param $s
  */
 function output_fail($s, $level = 0)
