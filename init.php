@@ -13,9 +13,7 @@
 
     require_once(PATH_script . 'includes/functions.php');
 
-
-
-
+    # list of activated modules
     $GLOBALS['modules'] = array(
         'cc',
         'config',
@@ -82,7 +80,11 @@
         chdir('..');
     }
     if (!is_dir('typo3conf')) {
-        die('TYPO3 not found');
+        if ($argv[1] == '_complete') {
+            die();
+        } else {
+            die('TYPO3 not found');
+        }
     }
 
     readData();
