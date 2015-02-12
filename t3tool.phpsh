@@ -1,16 +1,23 @@
 #!/usr/bin/env php
 <?php
     /**
+     * t3tool - cli tool for administering a TYPO3 installation
+     *
+     * @package t3tool
+     * @author Lars Køie <lars@koeie.dk>
+     * @license GNU GPL
+     *
+     */
+
+    /**
      *
      * Should be called from t3tool
      * path should be TYPO3 root dir (PATH_site)
      *
-     *
      */
 
+    // initialize
     require_once('init.php');
-
-
 
     $args = $argv;
 

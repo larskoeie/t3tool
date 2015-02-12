@@ -1,7 +1,11 @@
 <?php
 
 /**
+ * t3tool - cli tool for administering a TYPO3 installation
  *
+ * @package t3tool
+ * @author Lars Køie <lars@koeie.dk>
+ * @license GNU GPL
  *
  */
 
@@ -11,11 +15,9 @@
  * @param int $level
  *
  */
-function t3tool_handlecmd($argv, $level = 0)
-{
+function t3tool_handlecmd($argv, $level = 0) {
     $args = $argv;
     $module = array_shift($argv);
-
 
     if (isset($GLOBALS['aliases'][$module])) {
         if (is_array($GLOBALS['aliases'][$module])) {
