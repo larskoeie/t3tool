@@ -1,11 +1,15 @@
 <?php
+
   /**
+   * t3tool - cli tool for administering a TYPO3 installation
+   *
    * t3tool-cc.phpsh
    *
    * Clear cache.
    *
    * @package t3tool
-   * @author Lars Køie
+   * @author  Lars Køie <lars@koeie.dk>
+   * @license GNU GPL
    *
    */
 

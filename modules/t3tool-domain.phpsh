@@ -12,7 +12,7 @@
 /**
  * @param $args
  */
-function t3tool_domain_handlecmd($args)
+function t3tool_domain_handlecmd($args, $level=0)
 {
 
     $cmd = array_shift($args);
@@ -86,9 +86,7 @@ function t3tool_domain_handlecmd($args)
         //
         // Add a domain
         //
-        case 'add' :
         case 'add-record' :
-        case 'add-realurl' :
             $pid = $args[1];
             if (!trim($domain)) {
                 return ("Usage : t3tool domain add <domainName> <pid>\n");
@@ -100,8 +98,7 @@ function t3tool_domain_handlecmd($args)
             $pid = $page['uid'];
             $pagetitle = $page['title'];
 
-            if ($cmd == 'add' || $cmd == 'add-record') {
-                output_cmd("Adding domain '$domain' on page '" . $pagetitle . "'");
+                output_cmd("Adding domain '$domain' on page '" . $pagetitle . "'", $level);
                 $domains = sql_get_rows("
           select pages.uid, pages.title, domainName, sys_domain.hidden from sys_domain
           left join pages on pages.uid=sys_domain.pid
@@ -121,22 +118,22 @@ function t3tool_domain_handlecmd($args)
                     sql_query("insert into sys_domain (hidden, domainName, pid) values (0, '$domain', " . $page['uid'] . ")");
                     output_ok();
                 }
-            }
 
 
-            /*if ($cmd == 'add' || $cmd == 'add-realurl') {
+            break;
+
+        case 'add-realurl' :
+
               if (is_array($GLOBALS['realurl']['config'])) {
-                echo "Adding to realurl configuration... ";
+                output_cmd("Adding to realurl configuration... ", $level);
                 $temp = each($realurl_config);
                 $firstdomain = $temp['key'];
                 appendToPHPFile(PATH_site . $GLOBALS['realurl']['config']['configFile'], "\$TYPO3_CONF_VARS['EXTCONF']['realurl']['$domain'] = \$TYPO3_CONF_VARS['EXTCONF']['realurl']['$firstdomain'];");
                 appendToPHPFile(PATH_site . $GLOBALS['realurl']['config']['configFile'], "\$TYPO3_CONF_VARS['EXTCONF']['realurl']['$domain']['pagePath']['rootpage_id'] = $pid;");
-                echo "done.\n";
+                output_ok();
               } else {
                 echo "Realurl not configured.\n";
               }
-            }
-            */
             break;
 
         //
@@ -276,6 +273,13 @@ function get_ip_address($hostname)
 function t3tool_domain_cmdaliases()
 {
     return array(
+        'domain add' => array(
+            'commands' => array(
+                'domain add-record $0 $1',
+                'domain add-realurl $0 $1'
+            ),
+
+        ),
         'dblk' => 'domain disable',
         'ddel' => 'domain delete',
         'dcrt' => 'domain create',

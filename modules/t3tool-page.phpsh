@@ -113,7 +113,7 @@
         }
 
         $pids = getPidList($title);
-        echo "There are " . count($pids) . " pages:\n";
+         "There are " . count($pids) . " pages:\n";
         echo (implode(",", $pids));
         echo "\n\n";
         break;

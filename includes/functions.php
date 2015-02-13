@@ -4,7 +4,7 @@
 	 * t3tool - cli tool for administering a TYPO3 installation
 	 *
 	 * @package t3tool
-	 * @author Lars Køie <lars@koeie.dk>
+	 * @author  Lars Køie <lars@koeie.dk>
 	 * @license GNU GPL
 	 *
 	 */
@@ -19,26 +19,37 @@
 	 */
 	function t3tool_handlecmd($argv, $level = 0) {
 		$args = $argv;
-		$module = array_shift($argv);
-
-		if (isset($GLOBALS['aliases'][$module])) {
-			if (is_array($GLOBALS['aliases'][$module])) {
-				// run commmands
-				foreach ($GLOBALS['aliases'][$module]['commands'] as $str) {
-					foreach ($args as $k => $v) {
-						$str = str_replace('$' . $k, $v, $str);
-					}
-					$child_args = explode(' ', $str);
-					t3tool_handlecmd($child_args);
-				}
-
-			} else {
-				$args = explode(' ', str_replace($module, $GLOBALS['aliases'][$module], implode(' ', $args)));
-				t3tool_handlecmd($args);
-
-				return;
+		foreach ($args as $k=>$v) {
+			if ($v == '') {
+				unset($args[$k]);
 			}
 		}
+
+		// check if an alias matches
+		foreach ($args as $i => $value) {
+			$alias_key = implode(' ', array_slice($args, 0, $i));
+
+			if (isset($GLOBALS['aliases'][$alias_key])) {
+				$alias_args = array_slice($args, $i);
+				if (is_array($GLOBALS['aliases'][$alias_key])) {
+					// run commmands
+					foreach ($GLOBALS['aliases'][$alias_key]['commands'] as $str) {
+						foreach ($alias_args as $k => $v) {
+							$str = str_replace('$' . $k, $v, $str);
+						}
+						$child_args = explode(' ', $str);
+						return t3tool_handlecmd($child_args, $level + 1);
+					}
+
+				} else {
+					$args = explode(' ', str_replace($alias_key, $GLOBALS['aliases'][$alias_key], implode(' ', $args)));
+					return t3tool_handlecmd($args, $level + 1);
+				}
+			}
+		}
+
+		$module = array_shift($argv);
+
 
 		// handle help function
 		if ($module == 'help') {
@@ -144,8 +155,8 @@
 
 	/**
 	 * Connect to database. We use lazy database initialization for performance.
-	 * 
-	 * @return bool
+	 *
+	 * @return bool Success
 	 */
 	function initDB() {
 		if ($GLOBALS['DBIsInited']) {
@@ -179,7 +190,7 @@
 
 		$GLOBALS['DBIsInited'] = TRUE;
 
-		// remove tables from TCA that don't exist in database - they would produce errors
+		// remove tables from TCA that don't exist in database
 		$temp = sql_get_rows('show tables');
 		foreach ($temp as $temp2) {
 			list(, $table) = each($temp2);
@@ -189,12 +200,12 @@
 			$GLOBALS['TCA'] = array_intersect_key($GLOBALS['TCA'], $db_tables);
 		}
 
-
 		return TRUE;
-
 	}
 
 	/**
+	 * Query DB
+	 *
 	 * @param $sql
 	 *
 	 * @return bool|mysqli_result
@@ -217,13 +228,13 @@
 			}
 
 			return FALSE;
-
 		}
-
 		return $res;
 	}
 
 	/**
+	 * Fetch next associative array
+	 *
 	 * @param $res
 	 *
 	 * @return array|null
@@ -233,6 +244,8 @@
 	}
 
 	/**
+	 * Fetch next associative array
+	 *
 	 * @param $res
 	 *
 	 * @return array|null
@@ -264,7 +277,7 @@
 	 */
 	function sql_get_rows($sql) {
 		$res = sql_query($sql);
-		if ($res == FALSE) {
+		if ($res === FALSE) {
 			return FALSE;
 		}
 		if ($res === TRUE) {
@@ -274,7 +287,6 @@
 		while ($row = sql_fetch_assoc($res)) {
 			$rows[] = $row;
 		}
-
 		return $rows;
 	}
 
@@ -285,7 +297,6 @@
 	 */
 	function sql_num_rows() {
 		global $mysqli;
-
 		return mysqli_num_rows($mysqli);
 	}
 
@@ -296,11 +307,12 @@
 	 */
 	function sql_affected_rows() {
 		global $mysqli;
-
 		return mysqli_affected_rows($mysqli);
 	}
 
 	/**
+	 * Make an array from a single field from a query
+	 *
 	 * @param $sql
 	 *
 	 * @return array
@@ -362,14 +374,14 @@
 		if (!sizeof($a)) {
 			die("Page not found\n");
 		}
-		echo "Rootline for page :\n";
 		$a = array_reverse($a);
-
 		return $a;
 	}
 
 	/**
-	 * @param     $pid
+	 * Return an array of pids under a pid
+	 *
+	 * @param int $pid
 	 * @param int $depth
 	 *
 	 * @return array
@@ -385,8 +397,10 @@
 	}
 
 	/**
-	 * @param $pid
+	 * Get a rootline of a page formatted as delimited page titles
 	 *
+	 * @param int Page id
+	 * @param boolean Crop titles or not
 	 * @return string something like "TYPO3/Welcome/About..."
 	 */
 	function getFormattedRootline($pid, $crop = TRUE) {
@@ -426,6 +440,7 @@
 	/**
 	 * Crops the string around the search query and hilite the query within the string.
 	 *
+	 * @todo : at this point, actually only crops
 	 * @param $s
 	 * @param $q
 	 *
@@ -463,46 +478,11 @@
 		}
 	}
 
-	/**
-	 * @param $sql
-	 */
-	function format_ressource_function_is_deprecated($sql) {
-		$res = sql_query($sql);
-		while ($r = mysql_fetch_array($res)) {
-			$s[] = $r;
-			foreach ($r as $k => $v) {
-				if (!is_int($k)) {
-					$h[] = $k;
-				}
-			}
-		}
-		echo implode(', ', $h);
-	}
-
-	/**
-	 *
-	 */
-	function flattenArray_function_deprecated($a, &$b, $depth = 0, $table = '') {
-		foreach ($a as $pid => $page) {
-
-			$page['depth'] = $depth;
-			$page['table'] = $table;
-			$b[$pid] = $page;
-
-			if (isset($page['_'])) {
-				foreach ($page['_'] as $table => $records) {
-					flattenArray($records, $b, $depth + 1, $table);
-				}
-			}
-			unset($b[$pid]['_']);
-		}
-
-		return $b;
-	}
 
 	/**
 	 * Returns a delete clause for the table. Very similar to t3lib_befunc::enableFields().
 	 *
+	 * @todo : should use TCA
 	 * @param $table
 	 * @param $alias
 	 */
@@ -519,15 +499,19 @@
 			'pages',
 			'sys_template',
 			'tt_content'
-		))
-		) {
-			// all others have
+		))) {
 			return " and not $alias.deleted";
 		}
 
 		return '';
 	}
 
+	/**
+	 * Get value of flag/option
+	 *
+	 * @param string Name of flag
+	 * @return mixed Value
+	 */
 	function getFlag($f) {
 		if (!isset($GLOBALS['options'][$f])) {
 			return FALSE;
@@ -544,7 +528,7 @@
 	 * @param       $q
 	 * @param array $fields
 	 *
-	 * @return array|bool
+	 * @return array|bool Array of records or FALSE if no records
 	 */
 	function getRecordsByString($table, $q = '', $fields = array(), $selectFields = '*', $orderby = '', $limit = 0) {
 		if ($table == 'pages') {
@@ -631,6 +615,13 @@
 	}
 
 
+	/**
+	 * Get and return an array containing the first root page.
+	 * That is the topmost page in a fully expanded page tree, that contains a domain record.
+	 *
+	 * @param int Page id - for internal use, do not use.
+	 * @return bool
+	 */
 	function getFirstRootpage($pid = 0) {
 		$pages = sql_get_rows("
         select pages.uid, pages.pid, is_siteroot, title, domainName
@@ -718,6 +709,8 @@
 	}
 
 	/**
+	 * Convert an object to a readable string, in any way possible.
+	 *
 	 * @param $s
 	 */
 	function objectToString($s) {
@@ -737,6 +730,8 @@
 	}
 
 	/**
+	 * Format an array of records as a table with headers on top.
+	 *
 	 * @param array $a
 	 */
 	function sendAsFlatTable(array $a) {
@@ -805,7 +800,7 @@
 	}
 
 	/**
-	 * Formats and outputs an array of records as a table with headers on top.
+	 * Formats and outputs an array of records as a table with headers on top, sorted by elements path in page tree.
 	 *
 	 * @param array $a
 	 */
@@ -878,7 +873,6 @@
 		foreach ($t['value'] as $k => $v) {
 			$h[$k] = $k;
 		}
-		//array_unshift($a, $h);
 
 		foreach ($a as $y => $row) {
 			if (isset($row['deleted']) && $row['deleted']) {
@@ -912,9 +906,8 @@
 
 		foreach ($a as $y => $row) {
 
-			echo '| ';
-
-			echo implode(' | ', array(
+			$out .= '| ';
+			$out .= implode(' | ', array(
 				$row['_table'],
 				$row['uid'],
 				$row['pid'],
@@ -923,21 +916,29 @@
 			));
 
 			if (isset($row['_match'])) {
-				echo preg_replace("/\n|\r|\t/", ' ', $row['_match']);
+				$out .= preg_replace("/\n|\r|\t/", ' ', $row['_match']);
 			}
 
-			echo "\n";
+			$out .= "\n";
 
 			if (isset($row['_'])) {
 				foreach ($row['_'] as $table => $records) {
-					return sendAsTable($records, $depth + 1);
+					$out .= sendAsTable($records, $depth + 1);
 				}
 			}
 		}
 
+		return $out;
 	}
 
 
+	/**
+	 * Write a value to local configuration.
+	 *
+	 * @param $path
+	 * @param $value
+	 * @param null $local
+	 */
 	function setLocalConf($path, $value, $local = NULL) {
 		$path = explode('.', $path);
 
@@ -964,6 +965,12 @@
 
 	}
 
+	/**
+	 * Get filename of current configuration file. Relative to PATH_site.
+	 *
+	 * @param $local
+	 * @return string
+	 */
 	function getConfFilename($local) {
 		$filename = 'typo3conf/';
 		if ($GLOBALS['version_4']) {
@@ -976,10 +983,12 @@
 	}
 
 	/**
-	 * @param      $path dot separated list of keys
+	 * Get single value from local configuration.
+	 *
+	 * @param      $path Dot separated list of keys
 	 * @param null $local
 	 *
-	 * @return bool
+	 * @return mixed
 	 */
 	function getLocalConf($path) {
 		$data = $GLOBALS['TYPO3_CONF_VARS'];
@@ -994,6 +1003,12 @@
 	}
 
 
+	/**
+	 * Write a line to a php file, existing or not.
+	 *
+	 * @param $filename
+	 * @param $s
+	 */
 	function appendToPHPFile($filename, $s) {
 		$data = "";
 		if (file_exists($filename)) {
@@ -1011,6 +1026,8 @@
 	}
 
 	/**
+	 * Write t3tool persistent data to file.
+	 *
 	 * @param $data
 	 */
 	function writeData() {
@@ -1020,6 +1037,8 @@
 	}
 
 	/**
+	 * Read t3tool persistent data from file.
+	 *
 	 * @param $data
 	 */
 	function readData() {
@@ -1031,7 +1050,11 @@
 	}
 
 	/**
+	 * Like the *nix command 'tail -f', but for a MySQL table.
+	 * Returns nothing, as everything is sent to stdout directly.
+	 *
 	 * @param $sql
+	 * return void
 	 */
 	function sql_tail($sql) {
 		$n = 20;
@@ -1101,18 +1124,33 @@
 
 	}
 
+	/**
+	 * Enable realtime output to stdout.
+	 */
 	function enable_output() {
 		$GLOBALS['output'] = TRUE;
 	}
 
+	/**
+	 * Disable realtime output to stdout.
+	 */
 	function disble_output() {
 		$GLOBALS['output'] = FALSE;
 	}
 
+	/**
+	 * Output a piece of info to terminal.
+	 *
+	 * @param string The info
+	 * @param int The depth of command execution. For indentation.
+	 */
 	function output_info($s, $level = 0) {
 		$GLOBALS['info'][] = $s;
 	}
 
+	/**
+	 * @param $level
+	 */
 	function output_sendinfo($level) {
 
 	}

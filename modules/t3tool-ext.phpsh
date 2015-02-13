@@ -196,7 +196,8 @@ function t3tool_ext_handlecmd($args) {
 		# Show content of ext_emconf.php file and global configuration.
 		#
 		case 'show' :
-			if (!trim($ext)) {
+
+		if (!trim($ext)) {
 				return ("Usage : t3tool ext show <extkey>.\n");
 			}
 			return print_R($EM_CONF[$ext], 1) . "\n" . print_R(unserialize($GLOBALS['TYPO3_CONF_VARS']['EXT']['extConf'][$ext]), 1);
@@ -266,7 +267,6 @@ function t3tool_ext_handlecmd($args) {
 			t3tool_cc_config();
 			break;
 
-		case 'config' :
 
 
 		case 'dep' :
@@ -540,8 +540,7 @@ function t3tool_ext_completion() {
 	return array(
 		"ext" => array(
             'available' => 1,
-            'config' => 't3tool_ext_completion_exts',
-			'dependencies' => 1,
+ 			'dependencies' => 1,
             'dep-dot' => 1,
             'install' => 't3tool_ext_completion_exts',
             'installed' => 1,
