@@ -54,7 +54,7 @@ function t3tool_user_handlecmd($args) {
             break;
 
         //
-        // Set user's password.
+        // Set user's password from clear text
         //
         case 'password' :
             $user = getSingleRecordByString('be_users', $username, array(
@@ -85,6 +85,36 @@ function t3tool_user_handlecmd($args) {
             return '';
             break;
 
+        case 'password-hashed' :
+            $user = getSingleRecordByString('be_users', $username, array(
+                'username',
+                'email'
+            ));
+            $username = $user['username'];
+            if (!$username) {
+                output_usage("Usage:\n  t3tool user password-hashed <username> [<password>]\n  Password will be prompted if not supplied.\n");
+
+                return '';
+            }
+            output_cmd("Changing password for user $username.");
+
+            $password = trim($args[1]);
+            if (!$password) {
+                $password = readPassword();
+            }
+            if (!$password) {
+                output_info("Password can not be empty");
+                output_fail();
+                return FALSE;
+            }
+            $GLOBALS['t3tool_data']['stored_passwords'][$user['uid']][time()] = $user['password'];
+            writeData();
+            sql_query("update be_users set password='$password' where uid=" . $user['uid']);
+            output_ok();
+
+            return '';
+
+            break;
         //
         // Retrieve
         // TODO : finish this or remove it

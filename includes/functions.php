@@ -608,10 +608,10 @@
 			return $matches[0];
 		}
 		if ($matchcount > 1) {
-			die("There are $matchcount records matching $q - skipping.\n");
+			return FALSE;
 		}
 
-		die("There are no records matching $q - skipping.\n");
+		return FALSE;
 	}
 
 
@@ -1152,6 +1152,12 @@
 	 * @param $level
 	 */
 	function output_sendinfo($level) {
+		if (is_array($GLOBALS['info'])) {
+			foreach ($GLOBALS['info'] as $info) {
+				echo '        ' . str_repeat('  ', $level) . $info . "\n";
+			}
+		}
+		$GLOBALS['info'] = array();
 
 	}
 
@@ -1159,22 +1165,33 @@
 	 * @param $s
 	 */
 	function output_cmd($s, $level = 0) {
-		if ($GLOBALS['pos'] > 0) {
-			echo "\n";
-		}
-		$out = $s . '... ';
+		$out = '[....] ' . $s;
 		echo $out;
-		$GLOBALS['pos'] = strlen($out);
+	}
+
+	/**
+	 * @param $s
+	 * @param int $level
+	 */
+	function output_cmd_success ($out, $level = 0) {
+		// move all left
+		echo "\x1b[90D" .
+
+		// move one right
+		"\x1b[1C";
+
+		echo $out;
 	}
 
 	/**
 	 *
 	 */
 	function output_ok($s = '', $level = 0) {
-		$out = '[OK]';
-		echo str_repeat(' ', 200 - $GLOBALS['pos'] - strlen($out));
-		echo "\x1b[1;32m$out\x1b[0m\n";
-		$GLOBALS['pos'] = 0;
+		$out = ' ok ';
+		// add green
+		$out = "\x1b[1;32m$out\x1b[0m\n";
+
+		output_cmd_success($out, $level);
 		output_sendinfo($level + 1);
 	}
 
@@ -1183,7 +1200,7 @@
 	 */
 	function output_usage($s = '', $level = 0) {
 		$out = $s;
-		echo "\x1b[1;32m$out\x1b[0m\n";
+		echo $out;
 		$GLOBALS['pos'] = 0;
 		output_sendinfo($level + 1);
 		exit;
@@ -1193,13 +1210,11 @@
 	 * @param $s
 	 */
 	function output_fail($s, $level = 0) {
-		$out = '[Fail]';
-		if ($s) {
-			$out = $s . ' ' . $out;
-		}
-		echo str_repeat(' ', 200 - $GLOBALS['pos'] - strlen($out));
-		echo "\x1b[1;31m$out\x1b[0m\n";
-		$GLOBALS['pos'] = 0;
+		$out = 'fail';
+		// add red
+		$out = "\x1b[1;31m$out\x1b[0m\n";
+
+		output_cmd_success($out, $level);
 		output_sendinfo($level + 1);
 	}
 

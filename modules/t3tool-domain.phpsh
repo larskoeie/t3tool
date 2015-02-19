@@ -17,7 +17,9 @@ function t3tool_domain_handlecmd($args, $level=0)
 
     $cmd = array_shift($args);
     $domain = trim(strtolower($args[0]));
-    $domains = getRecordsByString('sys_domain', $domain, array('domainName'), 'uid, pid, domainName, hidden');
+    if ($domain) {
+        $domains = getRecordsByString('sys_domain', $domain, array('domainName'), 'uid, pid, domainName, hidden');
+    }
 
     switch ($cmd) {
 
@@ -107,11 +109,11 @@ function t3tool_domain_handlecmd($args, $level=0)
                 if (sizeof($domains)) {
                     $pagetitle = $domains[0]['title'];
                     if ($domains[0]['hidden']) {
-                        output_info("already exists disabled, enabling");
+                        output_info("Domain already exists disabled, enabling");
                         sql_query("update sys_domain set hidden=0 where domainName like '$domain'");
                         output_ok();
                     } else {
-                        output_info("already exists and enabled");
+                        output_info("Domain already exists and is enabled");
                         output_ok();
                     }
                 } else {
@@ -125,7 +127,7 @@ function t3tool_domain_handlecmd($args, $level=0)
         case 'add-realurl' :
 
               if (is_array($GLOBALS['realurl']['config'])) {
-                output_cmd("Adding to realurl configuration... ", $level);
+                output_cmd("Adding to realurl configuration", $level);
                 $temp = each($realurl_config);
                 $firstdomain = $temp['key'];
                 appendToPHPFile(PATH_site . $GLOBALS['realurl']['config']['configFile'], "\$TYPO3_CONF_VARS['EXTCONF']['realurl']['$domain'] = \$TYPO3_CONF_VARS['EXTCONF']['realurl']['$firstdomain'];");
@@ -180,12 +182,15 @@ function t3tool_domain_handlecmd($args, $level=0)
             if (!trim($domain)) {
                 return ("Usage : t3tool domain disable <domainName or uid>. Case insensitive.");
             }
+            if (!$domains) {
+
+            }
             foreach ($domains as $domain) {
                 if ($domain['hidden'] == 1) {
                     output_info($domain['domainName'] . " already disabled.\n");;
                 }
 
-                output_cmd("Disabling domain " . $domain['domainName'] . "... ");
+                output_cmd("Disabling domain: " . $domain['domainName'] );
                 sql_query("update sys_domain set hidden=1 where uid = " . $domain['uid']);
                 output_ok();
             }
@@ -205,7 +210,7 @@ function t3tool_domain_handlecmd($args, $level=0)
                     output_info($domain['domainName'] . " already enabled.\n");
                 }
 
-                output_cmd("Enabling " . $domain['domainName'] . "... ");
+                output_cmd("Enabling domain: " . $domain['domainName'] );
                 sql_query("update sys_domain set hidden=0 where uid = " . $domain['uid']);
                 output_ok();
             }
@@ -220,7 +225,7 @@ function t3tool_domain_handlecmd($args, $level=0)
             }
             $domain = getSingleRecordByString('sys_domain', $domain, array('domainName'));
 
-            output_cmd("Moving " . $domain['domainName'] . " to top... ");
+            output_cmd("Moving " . $domain['domainName'] . " to top");
             sql_query("update sys_domain set sorting=sorting+1");
             sql_query("update sys_domain set sorting=0 where uid = " . $domain['uid']);
             output_ok();

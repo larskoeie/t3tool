@@ -76,8 +76,7 @@ function t3tool_search_handlecmd($args) {
 		if (sizeof($rows)) {
 			$total = sql_get_row('select found_rows() as total');
 			$total = $total['total'];
-			echo "\n" . $table . ' : ' . $total . ' rows' . "\n";
-
+			echo "\nTable " . $table . ' : ' . $total . ' row(s)' . "\n";
 
 			foreach ($rows as $i => $row) {
 				$rows[$i]['_match'] = cropAndHilite($row['config'], $q);
