@@ -43,6 +43,31 @@ function t3tool_db_handlecmd($args) {
             }
             sql_tail('select uid from ' . $table . ' order by uid desc');
             break;
+
+		case 'pid-stat' :
+			$tables = array('all');
+			$rows = sql_get_rows('show tables');
+			foreach ($rows as $row) {
+				$temp = each($row);
+				$tables[] = $temp['value'];
+			}
+
+			foreach ($tables as $table) {
+				if (!stristr($table, $args[0]))
+					continue;
+
+				$pids = sql_get_rows('select pid, deleted, count(*), group_concat(uid) from ' . $table . ' group by pid, deleted');
+				if (is_array($pids)) {
+					$out .= $table . "\n";
+
+					$out .= sendAsFlatTableWithoutPaths($pids);
+				}
+
+			}
+
+
+			return $out;
+
 	}
 
 }

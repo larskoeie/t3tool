@@ -1,0 +1,50 @@
+<?php
+	/**
+	 * t3tool-fesession.phpsh
+	 *
+	 * Handles the command "t3tool fesession ...".
+	 *
+	 * @package t3tool
+	 * @author Lars Køie
+	 *
+	 */
+
+	/**
+	 * @param $args
+	 */
+	function t3tool_fesession_handlecmd($args, $level = 0) {
+
+		$cmd = array_shift($args);
+		$q = array_shift($args);
+
+		switch ($cmd) {
+
+			//
+			//
+			case 'list' :
+
+				$items = getRecordsByString('fe_session_data');
+				return sendAsFlatTable($items);
+
+			case 'show' :
+
+				$item = getRecordsByString('fe_session_data', $q, array('hash'));
+				return sendRecordAsTable($item);
+
+
+		}
+
+	}
+
+
+	/**
+	 * @return array
+	 */
+	function t3tool_fesession_completion() {
+		return array(
+			'fesession' => array(
+				'list' => 1,
+				'show' => 1,
+			)
+		);
+	}

@@ -1,0 +1,44 @@
+<?php
+	/**
+	 * t3tool-solr.phpsh
+	 *
+	 * Handles the command "t3tool domain ...".
+	 *
+	 * @package t3tool
+	 * @author Lars Køie
+	 *
+	 */
+
+	/**
+	 * @param $args
+	 */
+	function t3tool_solr_handlecmd($args, $level = 0) {
+
+		$cmd = array_shift($args);
+
+		switch ($cmd) {
+
+			//
+			//
+			case 'indexqueue-stat' :
+
+				$items = sql_get_rows('select indexing_configuration, if(errors = "", "no errors", "errors"), root, item_type, count(*)
+from tx_solr_indexqueue_item group by concat(indexing_configuration, if(errors = "", "no errors", "errors")) ');
+				return sendAsFlatTable($items);
+
+
+		}
+
+	}
+
+
+	/**
+	 * @return array
+	 */
+	function t3tool_solr_completion() {
+		return array(
+			'solr' => array(
+				'indexqueue-stat' => 1,
+			)
+		);
+	}

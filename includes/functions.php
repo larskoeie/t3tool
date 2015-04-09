@@ -295,9 +295,8 @@
 	 *
 	 * @return int
 	 */
-	function sql_num_rows() {
-		global $mysqli;
-		return mysqli_num_rows($mysqli);
+	function sql_num_rows($res) {
+		return mysqli_num_rows($res);
 	}
 
 	/**

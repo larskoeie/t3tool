@@ -1,6 +1,18 @@
 <?php
 
 
+    // find the root
+    while (!is_dir('typo3conf') && getcwd() != '/') {
+        chdir('..');
+    }
+    if (!is_dir('typo3conf')) {
+        if ($argv[1] == '_complete') {
+            die();
+        } else {
+            die('TYPO3 not found');
+        }
+    }
+
     # init
     define('TYPO3_MODE', 'BE');
     define('PATH_script', dirname(__FILE__) . '/');
@@ -22,6 +34,7 @@
         'devlog',
         'domain',
         'ext',
+        'fesession',
         'feuser',
         'history',
         'log',
@@ -32,6 +45,7 @@
         'search',
         'show',
         'sqlq',
+        'solr',
         'user',
         'task',
         'template'
@@ -76,16 +90,6 @@
         include($filename);
     }
 
-    while (!is_dir('typo3conf') && getcwd() != '/') {
-        chdir('..');
-    }
-    if (!is_dir('typo3conf')) {
-        if ($argv[1] == '_complete') {
-            die();
-        } else {
-            die('TYPO3 not found');
-        }
-    }
 
     readData();
 

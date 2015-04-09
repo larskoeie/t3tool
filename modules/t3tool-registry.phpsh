@@ -29,7 +29,7 @@
         }
         $records = getRecordsByString('sys_registry', $key, array('entry_namespace', 'entry_key'));
         if (!$records) {
-          return;
+          return 'No records';
         }
         return sendAsFlatTable($records);
 
@@ -45,7 +45,7 @@
         }
         $record = sql_get_row($sql);
         if (!$record) {
-          return;
+          return 'No match';
         }
         $value = unserialize($record['entry_value']);
         print_r($value);
@@ -60,14 +60,14 @@
           return('');
         }
         if (!$value) {
-          return;
+          return 'No value';
         }
         // check for existence
         $sql = "select entry_value from sys_registry where entry_key like '%$key%' and entry_namespace='$namespace'";
 
         $record = sql_get_row($sql);
         if (!$record) {
-          return;
+          return 'No match';
         }
         $value = serialize($value);
         $sql = "update sys_registry set entry_value='$value' where entry_key = '$key' and entry_namespace='$namespace'";

@@ -47,9 +47,10 @@
 
       // Realurl cache
       case 'realurl' :
-        sql_query('truncate tx_realurl_uniqalias');
-        sql_query('truncate tx_realurl_pathcache');
-        sql_query('truncate tx_realurl_chashcache');
+        t3tool_cc_truncate_table('tx_realurl_urlencodecache');
+        t3tool_cc_truncate_table('tx_realurl_urldecodecache');
+        t3tool_cc_truncate_table('tx_realurl_pathcache');
+        t3tool_cc_truncate_table('tx_realurl_chashcache');
         break;
 
       case 'stat' :
@@ -77,9 +78,21 @@
   t3tool cc all - All of the above.
   t3tool cc db - Truncate all cache tables in DB.
   t3tool cc pics - Empties typo3temp/pics.
+  t3tool cc realurl
+    Truncates tx_realurl_urlencodecache, tx_realurl_urldecodecache, tx_realurl_pathcache, tx_realurl_chashcache
 
   ");
     }
+
+  }
+
+  function t3tool_cc_truncate_table ($table) {
+    $res = sql_query('select * from ' . $table);
+    $rows = sql_num_rows($res);
+    output_cmd('Truncating ' . $table);
+    sql_query('truncate ' . $table);
+    output_info($rows . ' rows');
+    output_ok();
 
   }
 
@@ -88,16 +101,13 @@
    */
   function t3tool_cc_db() {
     $tables = sql_get_rows('show tables');
-    output_cmd("Truncating tables prefixed 'cache_' or 'cf_'");
     foreach ($tables as $table) {
       $temp = each($table);
       $table = $temp[1];
       if (preg_match('/^(cache)|(cf)_/', $table)) {
-        output_cmd("Truncating $table");
-        sql_query("truncate $table;");
+        t3tool_cc_truncate_table($table);
       }
     }
-    output_ok();
 
     return TRUE;
   }
@@ -159,6 +169,9 @@
    */
   function t3tool_cc_completion () {
     return array(
+      'cc' => array(
+        'realurl' => 1,
+      ),
 
     );
 

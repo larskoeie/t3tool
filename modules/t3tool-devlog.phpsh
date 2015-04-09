@@ -54,6 +54,9 @@
     }
   }
 
+/**
+ * @return string
+ */
   function t3tool_devlog_usage_short () {
     return ('Devlog commands:
   t3tool devlog tail -
