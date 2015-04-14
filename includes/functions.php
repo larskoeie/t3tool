@@ -17,13 +17,7 @@
 	 * @return string Human readable output of the command.
 	 *
 	 */
-	function t3tool_handlecmd($argv, $level = 0) {
-		$args = $argv;
-		foreach ($args as $k=>$v) {
-			if ($v == '') {
-				unset($args[$k]);
-			}
-		}
+	function t3tool_handlecmd($args, $level = 0) {
 
 		// check if an alias matches
 		foreach ($args as $i => $value) {
@@ -48,14 +42,14 @@
 			}
 		}
 
-		$module = array_shift($argv);
+		$module = array_shift($args);
 
 
 		// handle help function
 		if ($module == 'help') {
 			$out = '';
-			if ($argv[0]) {
-				$m = $argv[0];
+			if ($args[0]) {
+				$m = $args[0];
 				$function = 't3tool_' . $m . '_usage_long';
 				if (function_exists($function)) {
 					$out .= $function() . "\n";
@@ -69,28 +63,51 @@
 					}
 
 				}
+				$out .= "
+Options:
+  --deleted
+    Ignore 'deleted' field in all tables, and include deleted records in lists etc.
+  --deleted-elements
+    Ignore 'deleted' field in all tables except 'pages'. Will show all elements on pages that are not deleted.
+
+  --deleted-pages
+    Ignore 'deleted' field in table 'pages'. Will show elements on deleted pages.
+
+  --depth=<depth>
+    Depth for pidList when using --pid.
+  --exclude=<items>
+    Exclude these items from operation. Items is comma separated. What an item is depends on the active module.
+  --fields=<fields>
+    Comma separated list of fields to show instead of default ones.
+  --format=<format>
+
+  --include=<items>
+    Include these items. Overrides --exclude.
+  --only-deleted
+    Show only deleted records in lists etc. This is the recycler.
+  --output=<file>
+    Write output to a file. Progress, failures and general info is not sent to file.
+  --pid=<pidList>
+    Limit elements to those on pidList. Is infinitely recursive by default.
+
+  --quiet
+    Quiet, do not write anything to stdout.
+
+
+    ";
 			}
 
 			return $out;
 
-			/**
-			 * Flags are :
-			 * - d : include deleted records in lists and searches. Default is "exclude deleted records".
-			 * - f : full - do not crop long strings
-			 * - l : "local configuration" : Changes to configuration are written to the local one, the one in .gitignore (localconf_local or AdditionalConfiguration).
-			 * - p : "pid" - all operations are filtered to elements on this pid - not implemented yet
-			 * - r : "recursive" - infinitely - not implemented yet
-			 * - v : verbose - show all output
-			 *
-			 */
 
 		}
+
 
 		// dispatch command and arguments to module
 		if (in_array($module, $GLOBALS['modules'])) {
 			$function = 't3tool_' . $module . '_handlecmd';
 			if (function_exists($function)) {
-				return $function($argv, $level + 1);
+				return $function($args, $level + 1);
 			}
 
 		} else {
@@ -479,6 +496,34 @@
 
 
 	/**
+	 * @param $table
+	 * @param string $alias
+	 * @return string
+	 */
+	function getDefaultWhereClause ($table, $alias = '') {
+		return
+			getPidClause($table, $alias) .
+			getDeleteClause($table, $alias);
+	}
+
+	/**
+	 * @param $table
+	 * @param $alias
+	 * @return string
+	 */
+	function getPidClause ($table, $alias = '') {
+		if ($alias == '') {
+			$alias = $table;
+		}
+
+		$pid = getOption('pid');
+		if ($pid !== NULL) {
+			return " AND $alias.pid in (" . implode(',', getPidList($pid, getOption('depth'))) . ')';
+		}
+
+		return '';
+	}
+	/**
 	 * Returns a delete clause for the table. Very similar to t3lib_befunc::enableFields().
 	 *
 	 * @todo : should use TCA
@@ -486,12 +531,13 @@
 	 * @param $alias
 	 */
 	function getDeleteClause($table, $alias = '') {
-		if (getFlag('d')) {
+		if (getOption('deleted')) {
 			return '';
 		}
 		if ($alias == '') {
 			$alias = $table;
 		}
+
 
 		// these tables have field deleted
 		if (in_array($table, array(
@@ -499,6 +545,10 @@
 			'sys_template',
 			'tt_content'
 		))) {
+			if (getOption('only-deleted')) {
+				return " and $alias.deleted";
+			}
+
 			return " and not $alias.deleted";
 		}
 
@@ -506,19 +556,47 @@
 	}
 
 	/**
-	 * Get value of flag/option
+	 * DEPRECATED Get value of flag/option
 	 *
 	 * @param string Name of flag
 	 * @return mixed Value
+	 * @deprecated Use getOption instead
 	 */
 	function getFlag($f) {
-		if (!isset($GLOBALS['options'][$f])) {
-			return FALSE;
-		}
-
-		return $GLOBALS['options'][$f];
+		return getOption($f);
 	}
 
+	/**
+	 * @return bool
+	 */
+	function getOption() {
+		foreach (func_get_args() as $opt) {
+			if (isset($GLOBALS['options'][$opt])) {
+				return $GLOBALS['options'][$opt];
+			}
+		}
+		return FALSE;
+	}
+
+	/**
+	 * @param $items array
+	 * @return array
+	 */
+	function getItemList ($items) {
+
+		$include = getOption('include');
+		$exclude = getOption('exclude');
+
+		if ($include) {
+			return array_intersect($items, explode(',', $include));
+		}
+
+		if ($exclude) {
+			$items = array_diff($items, explode(',', $exclude));
+		}
+
+		return $items;
+	}
 
 	/**
 	 * Returns records from table that match q in one of the fields.
@@ -564,7 +642,7 @@
 
 				} else {
 					// "!" used in a way that is not allowed
-					output_fail('"!" is allowed only as first character and only followed by paranthesises that surround the entire string.');
+					output_fail('"!" is allowed only as first character and only followed by parenthesises that surround the entire string.');
 					return array();
 				}
 			} else {
@@ -736,57 +814,99 @@
 	function sendAsFlatTable(array $a) {
 		$return = '';
 
-		$l = array();
-		if (!sizeof($a)) {
-			return "No records\n";
-		}
-		$cols = array_keys($a[0]);
-		$footer[$cols[0]] = count($a);
-
-		foreach ($a as $y => $row) {
-			foreach ($row as $x => $d) {
-				$a[$y][$x] = objectToString($a[$y][$x]);
+		if (getOption('raw')) {
+			// output first column of each row
+			foreach ($a as $y=>$row) {
+				$lines[] = array_values($row)[0];
 			}
+			return implode("\n", $lines) . "\n";
+
 		}
-		foreach ($a as $y => $row) {
-			foreach ($row as $x => $d) {
-				$h[$x] = $x;
-				$l[$x] = max($l[$x], strlen($d));
-				$l[$x] = max($l[$x], strlen($x));
-			}
+		switch (getOption('format')) {
+
+			case 'json' :
+
+				return json_encode($a);
+				break;
+
+			case 'csv' :
+
+				foreach ($a as $y => $row) {
+					if ($y == 0) {
+						foreach ($row as $x => $value) {
+							$header[$x] = '"' . $x . '"';
+						}
+						$lines[] = implode(',', $header);
+					}
+					foreach ($row as $x => $value) {
+						$row[$x] = '"' . $row[$x] . '"';
+					}
+					$lines[] = implode(',', $row);
+				}
+				return implode("\n", $lines) . "\n";
+
+				break;
+
+			case FALSE :
+			case 'table' :
+
+				$l = array();
+				if (!sizeof($a)) {
+					return "No records\n";
+				}
+				$cols = array_keys($a[0]);
+				$footer[$cols[0]] = count($a);
+
+				foreach ($a as $y => $row) {
+					foreach ($row as $x => $d) {
+						$a[$y][$x] = objectToString($a[$y][$x]);
+					}
+				}
+				foreach ($a as $y => $row) {
+					foreach ($row as $x => $d) {
+						$h[$x] = $x;
+						$l[$x] = max($l[$x], strlen($d));
+						$l[$x] = max($l[$x], strlen($x));
+					}
+				}
+
+				foreach ($a as $y => $row) {
+					foreach ($row as $x => $d) {
+						$a[$y][$x] = str_pad($d, $l[$x]);
+						$h[$x] = str_pad($h[$x], $l[$x]);
+						$footer[$x] = str_pad($footer[$x], $l[$x]);
+						$b[$x] = str_pad('', $l[$x], '-');
+					}
+				}
+
+				foreach ($a as $y => $row) {
+					$sorted[$row['pid']][] = $row;
+				}
+
+
+				$return .= "+-" . implode('-+-', $b) . "-+\n";
+				$return .= "| " . implode(' | ', $h) . " |\n";
+				$return .= "+-" . implode('-+-', $b) . "-+\n";
+				foreach ($sorted as $pid => $a) {
+					if ($pid) {
+						$return .= "| " . str_pad('- ' . getFormattedRootline($pid, TRUE) . ' :', array_sum($l) + 3 * (sizeof($l) - 1)) . " |\n";
+					}
+					foreach ($a as $y => $row) {
+						$return .= '| ';
+						$return .= implode(' | ', $row) . " |\n";
+					}
+				}
+				$return .= "+-" . implode('-+-', $b) . "-+\n";
+				$return .= "| " . implode(' | ', $footer) . " |\n";
+				$return .= "+-" . implode('-+-', $b) . "-+\n";
+
+				return $return;
+				break;
+
+			default :
+				return "Format is not supported for that command\n";
 		}
 
-		foreach ($a as $y => $row) {
-			foreach ($row as $x => $d) {
-				$a[$y][$x] = str_pad($d, $l[$x]);
-				$h[$x] = str_pad($h[$x], $l[$x]);
-				$footer[$x] = str_pad($footer[$x], $l[$x]);
-				$b[$x] = str_pad('', $l[$x], '-');
-			}
-		}
-
-		foreach ($a as $y => $row) {
-			$sorted[$row['pid']][] = $row;
-		}
-
-
-		$return .= "+-" . implode('-+-', $b) . "-+\n";
-		$return .= "| " . implode(' | ', $h) . " |\n";
-		$return .= "+-" . implode('-+-', $b) . "-+\n";
-		foreach ($sorted as $pid => $a) {
-			if ($pid) {
-				$return .= "| " . str_pad('- ' . getFormattedRootline($pid, TRUE) . ' :', array_sum($l) + 3 * (sizeof($l) - 1)) . " |\n";
-			}
-			foreach ($a as $y => $row) {
-				$return .= '| ';
-				$return .= implode(' | ', $row) . " |\n";
-			}
-		}
-		$return .= "+-" . implode('-+-', $b) . "-+\n";
-		$return .= "| " . implode(' | ', $footer) . " |\n";
-		$return .= "+-" . implode('-+-', $b) . "-+\n";
-
-		return $return;
 	}
 
 	/**
@@ -1153,7 +1273,7 @@
 	function output_sendinfo($level) {
 		if (is_array($GLOBALS['info'])) {
 			foreach ($GLOBALS['info'] as $info) {
-				echo '        ' . str_repeat('  ', $level) . $info . "\n";
+				t3tool_output ('        ' . str_repeat('  ', $level) . $info . "\n");
 			}
 		}
 		$GLOBALS['info'] = array();
@@ -1165,21 +1285,16 @@
 	 */
 	function output_cmd($s, $level = 0) {
 		$out = '[....] ' . $s;
-		echo $out;
+		t3tool_output($out);
 	}
 
 	/**
 	 * @param $s
 	 * @param int $level
 	 */
-	function output_cmd_success ($out, $level = 0) {
-		// move all left
-		echo "\x1b[90D" .
-
-		// move one right
-		"\x1b[1C";
-
-		echo $out;
+	function output_cmd_success($out, $level = 0) {
+		// move all left and one right
+		t3tool_output("\x1b[200D\x1b[1C" . $out);
 	}
 
 	/**
@@ -1208,7 +1323,7 @@
 	/**
 	 * @param $s
 	 */
-	function output_fail($s, $level = 0) {
+	function output_fail($s = '', $level = 0) {
 		$out = 'fail';
 		// add red
 		$out = "\x1b[1;31m$out\x1b[0m\n";
@@ -1217,6 +1332,21 @@
 		output_sendinfo($level + 1);
 	}
 
+	function t3tool_output ($s) {
+		if (getOption('quiet')) {
+			return;
+		}
+
+		echo $s;
+	}
+
+
+	/**
+	 * @param $s
+	 */
+	function t3tool_debug ($s) {
+
+	}
 
 	function t3tool_core_completion_tables() {
 		$tables = array('all');

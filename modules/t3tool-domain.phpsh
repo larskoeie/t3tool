@@ -16,6 +16,10 @@ function t3tool_domain_handlecmd($args, $level=0)
 {
 
     $cmd = array_shift($args);
+
+
+    $domains = getRecordsByString('sys_domain', '', array(), 'uid, pid, domainName, hidden');
+
     $domain = trim(strtolower($args[0]));
     if ($domain) {
         $domains = getRecordsByString('sys_domain', $domain, array('domainName'), 'uid, pid, domainName, hidden');
@@ -61,6 +65,7 @@ function t3tool_domain_handlecmd($args, $level=0)
             if ($cmd == 'check' || $cmd == 'dnsandcheck') {
                 foreach ($domains as $i => $domain) {
                     $domainname = $domain['domainName'];
+                    output_cmd('Checking ' . $domainname);
                     $token = md5($domainname . time());
                     $filename = $token . '.html';
                     $data = $token;
@@ -69,8 +74,18 @@ function t3tool_domain_handlecmd($args, $level=0)
                     // we are not interested in 404, hence the @
                     $check_data = @file_get_contents($url);
 
-                    $domains[$i]['check'] = ($data == $check_data) ? 'OK' : 'Fail';
+                    // not used at the moment, but could be used to indicate a proxy
+                    $headers = $http_response_header;
+
+                    if ($data == $check_data) {
+                        output_ok();
+                        $domains[$i]['check'] = 'OK';
+                    } else {
+                        output_fail();
+                        $domains[$i]['check'] = 'Fail';
+                    }
                     unlink(PATH_site . 'typo3temp/' . $filename);
+
                 }
 
             }
@@ -187,7 +202,7 @@ function t3tool_domain_handlecmd($args, $level=0)
             }
             foreach ($domains as $domain) {
                 if ($domain['hidden'] == 1) {
-                    output_info($domain['domainName'] . " already disabled.\n");;
+                    output_info($domain['domainName'] . " already disabled.");;
                 }
 
                 output_cmd("Disabling domain: " . $domain['domainName'] );

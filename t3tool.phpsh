@@ -19,10 +19,84 @@
     // initialize
     require_once('init.php');
 
-    $args = $argv;
 
     // remove arg-0 which is path to script
-    array_shift($args);
+    array_shift($argv);
+
+    /** Handle options :
+     *
+     * Options can be mixed with arguments in any desired order.
+     * Options can be one letter (one dash) or multiple letters (two dashes).
+     * Options can be boolean or string.
+     * Option indexes and values are case sensitive.
+     *
+     * Valid option formats are :
+     * "--page=12" : sets option page to string 12
+     * "--page"    : sets option page to bool true
+     * "-p=12"     : sets option p to string 12
+     * "-p"        : sets option p to bool true
+     * "-p 12"     : sets option p to string 12, but requires that p is in array $options_w_values below (is this bad practice ? - mysql uses it)
+     *
+     * Known options are :
+     * "-d" or "--deleted" : include deleted records in lists and searches. Default is "exclude deleted records".
+     * "-f" : full - do not crop long strings
+     * - l : "local configuration" : Changes to configuration are written to the local one, the one in .gitignore (localconf_local or AdditionalConfiguration).
+     * "--output" : write special output to file
+     * "-p" : "pid" - all operations are filtered to elements on this pid - not implemented yet
+     * "-r" : "recursive" - use with "-p" - infinitely - not implemented yet
+     * "--raw" : show raw output, and not any human-readable stuff
+     * "-v" : verbose - show all output
+     */
+
+    // only one-letter options can go here. Multiple-letter options that are not boolean, requires use of equal sign.
+    $options_w_values = array('p');
+
+    foreach ($argv as $k => $v) {
+        if ($v == '') {
+            unset($argv[$k]);
+        }
+    }
+
+    $removeNext = FALSE;
+    foreach ($argv as $i => $arg) {
+        if ($removeNext) {
+            $removeNext = FALSE;
+            continue;
+        }
+        if ($arg{0} == '-') {
+            if (strpos($arg, '=')) {
+                list($arg, $val) = explode('=', $arg);
+            } else {
+                $val = FALSE;
+            }
+            if ($arg{1} == '-') {
+                $flag = substr($arg, 2);
+                $GLOBALS['options'][$flag] = $val ? $val : TRUE;
+            } else {
+                $flag = $arg{1};
+                if (! $val) {
+                    for ($l=0; $l<strlen($arg)-1; $l++){
+                        $f = $arg{$l+1};
+                        if (in_array($f, $options_w_values)) {
+                            if (! isset($argv[$i + 1])) {
+                                die("t3tool: option '$flag' requires an argument\n");
+                            }
+
+                            $val = $argv[$i + 1];
+                            $removeNext = TRUE;
+
+                        }
+                        $GLOBALS['options'][$f] = $val ? $val : TRUE;
+
+                    }
+                }
+            }
+        } else {
+            $args[] = $arg;
+        }
+    }
+
+    t3tool_debug(array('args' => $args, 'options' => $GLOBALS['options']));
 
     // handle command
     echo t3tool_handlecmd($args);

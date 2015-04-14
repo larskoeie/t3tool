@@ -73,10 +73,12 @@ function t3tool_template_handlecmd($args)
             $line = "\n$key = $value\n";
 
             sql_query("update sys_template set config=concat(config, '$line') where pid=$pid and not hidden order by sorting limit 1");
-            if (!sql_affected_rows())
+            if (sql_affected_rows()) {
+                output_ok();
+            } else {
                 output_fail("No templates on page. Nothing done.");
+            }
 
-            output_ok();
             break;
 
         #

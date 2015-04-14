@@ -2,8 +2,11 @@
 
 
     // find the root
-    while (!is_dir('typo3conf') && getcwd() != '/') {
+    while (!is_dir('typo3conf') && !is_file('.t3tool-root') && getcwd() != '/') {
         chdir('..');
+    }
+    if (is_file('.t3tool-root')) {
+       chdir(trim(file_get_contents('.t3tool-root')));
     }
     if (!is_dir('typo3conf')) {
         if ($argv[1] == '_complete') {
@@ -115,3 +118,5 @@
         'tt_content' => 'header',
         'tt_news' => 'title',
     );
+
+
