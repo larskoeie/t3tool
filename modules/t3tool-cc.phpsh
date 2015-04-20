@@ -26,15 +26,17 @@
         break;
 
       // Delete cached code.
+      case 'code' :
+      // in v4.x, this was called "Configuration Cache"
       case 'config' :
-        t3tool_cc_config();
+        t3tool_cc_code();
         break;
 
       // both of the above
       case 'all' :
 
         t3tool_cc_content();
-        t3tool_cc_config();
+        t3tool_cc_code();
         break;
 
       case 'db' :
@@ -74,7 +76,7 @@
       default :
         return ("Clear cache commands:
   t3tool cc content - Truncates all cache tables.
-  t3tool cc config - Deletes any cached code from extensions.
+  t3tool cc code - Deletes any cached code from extensions.
   t3tool cc all - All of the above.
   t3tool cc db - Truncate all cache tables in DB.
   t3tool cc pics - Empties typo3temp/pics.
@@ -122,8 +124,9 @@
   /**
    *
    */
-  function t3tool_cc_config() {
-    output_cmd("Clearing config cache");
+  function t3tool_cc_code() {
+    output_cmd("Clearing cached code");
+    // v 4.x
     $files = scandir(PATH_typo3conf);
     foreach ($files as $file) {
       if (preg_match('/^temp_CACHED/', $file)) {
@@ -131,11 +134,18 @@
       }
     }
 
-    rmdir_recursive(PATH_site . 'typo3temp/Cache/Code/');
+    // v 6.x
+    $count = rmdir_recursive(PATH_site . 'typo3temp/Cache/Code/');
+
+    output_info($count . ' entries');
     output_ok();
   }
 
 
+  /**
+   * @param $dir
+   * @return bool
+   */
   function rmdir_recursive($dir) {
     if (!is_dir($dir)) {
       return TRUE;
@@ -145,18 +155,20 @@
         continue;
       }
       if (is_dir("$dir/$file")) {
-        rmdir_recursive("$dir/$file");
+        $count += rmdir_recursive("$dir/$file");
       } else {
         unlink("$dir/$file");
+        $count ++;
       }
     }
     rmdir($dir);
+    return $count;
   }
 
   function t3tool_cc_usage_short () {
     return ("Clear cache commands:
   t3tool cc content - Truncates all cache tables.
-  t3tool cc config - Deletes any cached code from extensions.
+  t3tool cc code - Deletes any cached code from extensions.
   t3tool cc all - All of the above.
   t3tool cc db - Truncate all cache tables in DB.
   t3tool cc pics - Empties typo3temp/pics.
@@ -170,6 +182,7 @@
   function t3tool_cc_completion () {
     return array(
       'cc' => array(
+        'code' => 1,
         'realurl' => 1,
       ),
 

@@ -335,7 +335,7 @@ function t3tool_user_handlecmd($args) {
 
                 output_cmd("Enabling backend user " . $user['username']);
                 sql_query("update be_users set disable=0 where uid= " . $user['uid'] . " limit 1");
-           //     output_ok('', $level);
+                output_ok('', $level);
             }
             return '';
 

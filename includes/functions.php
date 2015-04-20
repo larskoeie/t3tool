@@ -608,6 +608,8 @@ Options:
 	 * @return array|bool Array of records or FALSE if no records
 	 */
 	function getRecordsByString($table, $q = '', $fields = array(), $selectFields = '*', $orderby = '', $limit = 0) {
+		$q = strtolower($q);
+
 		if ($table == 'pages') {
 			// handle special "magic" shorthands
 			switch ($q) {
@@ -653,7 +655,7 @@ Options:
 				}
 
 				foreach ($fields as $field) {
-					$or .= " or $table.$field like '$q'";
+					$or .= " or lower(convert($table.$field using utf8)) like '$q'";
 				}
 				$where = "and ($or)" . getDeleteClause($table);
 
@@ -661,10 +663,11 @@ Options:
 
 		}
 
-		$matches = sql_get_rows("select $selectFields from $table where 1 " . $where .
+		$sql = "select $selectFields from $table where 1 " . $where .
 			($orderby ? ' order by ' . $orderby : '') .
-			($limit ? ' limit ' . $limit : '')
-		);
+			($limit ? ' limit ' . $limit : '');
+		t3tool_debug($sql);
+		$matches = sql_get_rows($sql);
 
 		return $matches;
 	}
@@ -779,10 +782,24 @@ Options:
 	 * @return string
 	 */
 	function crop($s, $l = 50) {
-		if (getFlag('f')) {
+		if (getOption('full')) {
 			return $s;
 		}
 		return substr($s, 0, $l) . (strlen($s) > $l ? ' ...' : '');
+	}
+
+	/**
+	 * @param $needle
+	 * @param array $haystack
+	 * @return bool
+	 */
+	function in_array_wildcard ($needle, array $haystack) {
+		foreach ($haystack as $item) {
+			if (preg_match(';^' . str_replace('*', '.*', $item) . '$;', $needle)) {
+				return TRUE;
+			}
+		}
+		return FALSE;
 	}
 
 	/**
@@ -1345,6 +1362,9 @@ Options:
 	 * @param $s
 	 */
 	function t3tool_debug ($s) {
+		if (getOption('debug')) {
+			print_r( $s);
+		}
 
 	}
 

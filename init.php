@@ -12,7 +12,7 @@
         if ($argv[1] == '_complete') {
             die();
         } else {
-            die('TYPO3 not found');
+            die("TYPO3 not found\n");
         }
     }
 

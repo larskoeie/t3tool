@@ -5,8 +5,14 @@
 	 * Handles the commands "t3tool ext ...".
 	 *
 	 * Extensions can be filtered in a number of ways :
-	 * - type (local, global, system) - often local will be most relevant
-	 * - installed/not installed - often installed will be most relevant
+	 * - type (local, global or system)
+	 *   default is local only
+	 *   --system adds system
+	 *   --only-system gives only system
+	 * - installed/not installed
+	 *   default is installed only
+	 *   --inactive adds inactive
+	 * -- include adds
 	 * - tracked/not tracked
 	 *
 	 * @package t3tool
@@ -98,6 +104,28 @@
 			}
 		}
 
+
+		// build list of extensions to handle
+		$include = explode(',', getOption('include'));
+		$exclude = explode(',', getOption('exclude'));
+		$showOnlyExts = array();
+		foreach ($EM_CONF as $_EXTKEY => $config) {
+			$handle =
+				(getOption('all')
+					|| (
+						($config['added by t3tool']['type'] == 'Local')
+						|| (($config['added by t3tool']['type'] == 'System') && getOption('system'))
+						|| in_array($_EXTKEY, $include)
+					)
+					&& ($config['added by t3tool']['installed'] || getOption('inactive')))
+				&& !in_array($_EXTKEY, $exclude);
+
+			if ($handle) {
+				$showOnlyExts[] = $_EXTKEY;
+			}
+		}
+
+		t3tool_debug($showOnlyExts);
 		ksort($EM_CONF);
 
 
@@ -135,16 +163,58 @@
 			// List of installed extensions
 			//
 			case 'list' :
-			case 'installed' :
-				foreach ($exts as $extkey) {
+				foreach ($showOnlyExts as $i => $extkey) {
 					$config = $EM_CONF[$extkey];
 					if (!$ext || preg_match("/$ext/", $extkey) || preg_match("/$ext/", $config['title'])) {
 						$extdata = array(
 							'key' => $extkey,
-							'title' => $config['title'],
 							'version' => $config['version'],
 							'type' => $config['added by t3tool']['type'],
+							'installed' => $config['added by t3tool']['installed'],
 						);
+
+						if (getOption('ter')) {
+
+							if ($extdata['type'] != 'Local' || isInTer($extKey)) {
+								$secureVersion = getSecureVersion($extKey, $info['version']);
+								$latestVersion = getLatestVersion($extKey, $info['version']);
+
+								$extdata['latest'] = $latestVersion;
+
+								$extdataUpdate = $latestVersion != $info['version'];
+								$extdataSecurity = $secureVersion != $info['version'];
+
+
+								if ($extdataUpdate) {
+									$extdata['status'] = 'Update';
+								}
+								if ($extdataSecurity) {
+									$extdata['status'] = 'SECURITY update';
+								}
+							} else {
+								$extdata['status'] = 'Not in TER';
+
+							}
+						}
+
+						$siteUpdate |= $extdataUpdate;
+						$siteSecurity |= $extdataSecurity;
+
+						if (getOption('git')) {
+							// check git
+							$path = PATH_site . $config['added by t3tool']['path'] . $extkey;
+							if (is_file($path . '/.git') || is_dir($path . '/.git')) {
+								$output = array();
+								exec("cd $path; git log -1 --pretty=format:%h%n%ar%n%an", $output);
+								$extdata['commit'] = $output[0];
+								if (getOption('git') === 'full') {
+									$extdata['time'] = $output[1];
+									$extdata['author'] = $output[2];
+								}
+							}
+
+						}
+
 						$extlist[] = $extdata;
 					}
 				}
@@ -155,40 +225,16 @@
 				}
 				break;
 
-			//
-			// List of not installed extensions
-			//
-			case 'notinstalled' :
-				foreach ($EM_CONF as $extkey => $config) {
-					if (in_array($extkey, $exts)) {
-						continue;
-					}
-					if (!$ext || preg_match("/$ext/", $extkey) || preg_match("/$ext/", $config['title'])) {
-						$extdata = array(
-							'key' => $extkey,
-							'title' => $config['title'],
-							'version' => $config['version'],
-							'type' => $config['added by t3tool']['type'],
-						);
-						$extlist[] = $extdata;
-					}
-				}
-				if (sizeof($extlist)) {
-					echo "Extensions present, but not installed:\n";
-					return sendAsFlatTable($extlist);
-				} else {
-					echo "No not-installed extensions\n";
-				}
-				break;
-
 			case 'mentions' :
 				$extkeys = array();
 
-				$include = explode(',', (string)getOption('include'));
-				$exclude = explode(',', (string)getOption('exclude'));
+				$from = trim(strtolower($args[0]));
+				$from = $from ? explode(',', $from) : NULL;
+				$to = trim(strtolower($args[1]));
+				$to = $to ? explode(',', $to) : NULL;
+
 				$showOnlyExts = getItemList($exts);
 
-//		9i83jds2
 				// make list of strings to search for
 				foreach ($EM_CONF as $_EXTKEY => $config) {
 					if ($EM_CONF[$_EXTKEY]['added by t3tool']['installed'] &&
@@ -205,18 +251,37 @@
 					if ($EM_CONF[$_EXTKEY]['added by t3tool']['installed'] &&
 						$EM_CONF[$_EXTKEY]['added by t3tool']['type'] == 'Local' &&
 						!in_array($_EXTKEY, $exclude)
+
 					) {
 						output_cmd('Checking ' . $_EXTKEY);
 
 						$path = $EM_CONF[$_EXTKEY]['added by t3tool']['path'] . $_EXTKEY;
 						foreach ($prefixes as $dependee => $temp) {
+							// if either is excluded, do not search
 							if (in_array($_EXTKEY, $exclude) || in_array($dependee, $exclude)) {
 								continue;
+							}
+							// if arg-0 is set and neither is in arg-0, do not search
+							if ($from) {
+								if ($to) {
+									if (!in_array_wildcard($_EXTKEY, $from) || !in_array_wildcard($dependee, $to)) {
+										continue;
+									}
+								} else {
+									if (!in_array_wildcard($_EXTKEY, $from) && !in_array_wildcard($dependee, $from)) {
+										continue;
+									}
+								}
 							}
 
 							if ($dependee != $_EXTKEY) {
 								foreach ($temp as $prefix) {
-									$command = 'grep -rn --exclude="composer.json" --exclude="ext_emconf.php" "' . $prefix . '" ' . $path;
+									$command = "cd $path; ";
+									$command .= 'grep -rni --exclude="composer.json" --exclude="ext_emconf.php"';
+									if (getOption('include-files')) {
+										$command .= ' --include="' . getOption('include-files') . '"';
+									}
+									$command .= ' "' . $prefix . '" .';
 									$output = NULL;
 									exec($command, $output);
 									if (sizeof($output)) {
@@ -226,14 +291,40 @@
 										// determine file extensions
 										$fileextensions = array();
 										foreach ($output as $file) {
-											if (preg_match('/\.([a-z0-9]{1,4}):[0-9]+:/', $file, $m)) {
+
+
+											$header_ext = "\n$_EXTKEY mentions $dependee :\n";
+
+											if ($header_ext != $_header_ext) {
+												$report .= $header_ext;
+												$_header_ext = $header_ext;
+											}
+
+											if (preg_match(';^\./(.+\.([a-z0-9]{1,4})):([0-9]+):(.+)$;', $file, $m)) {
+												$filepath = $m[1];
+												$fileextension = $m[2];
+												$linenum = $m[3];
+												$linenum_padded = str_pad($line, 4, ' ', STR_PAD_LEFT);
+												$line = trim($m[4], " \t");
+
+												if ($filepath != $_filepath) {
+													$report .= "\n\n  $filepath";
+													$_filepath = $filepath;
+												}
+												$report .= "\n    $linenum_padded : $line";
 												$fileextensions[$m[1]] = TRUE;
+
+												if (TRUE) {
+													$command = "cd $path; git blame -L $linenum,$linenum $filepath";
+													echo $command;
+													$output = array();
+													exec($command, $output);
+													$report .= "\n      " . $output[0] . "\n";
+												}
 											}
 										}
 
 										$mentions[$_EXTKEY][$dependee] = implode(',', array_keys($fileextensions)) . ' (' . sizeof($output) . ')';
-										$report .= "$_EXTKEY mentions $dependee :\n";
-										$report .= "  " . implode("\n  ", $output) . "\n";
 
 
 									}
@@ -247,7 +338,7 @@
 					}
 				}
 
-				if (FALSE) {
+				if (TRUE) {
 					echo $report;
 				}
 
@@ -258,21 +349,18 @@
 				print_r($mentions);
 
 				if (getOption('dot')) {
-					$graphLabel = 'All extension mentions';
-					if ($showOnlyExts) {
-						$graphLabel = 'Extension mentions of ' . implode(', ', $showOnlyExts);
-					}
+					$graphLabel = 'Extension mentions';
 
 					$output = "digraph extension_mentions {
 
 				size =\"60,60\";
 				label = \"$graphLabel\"
 				labelloc = \"t\";
-			rankdir = BT;
 			sep=\"+25,25\";
 overlap=scalexy;
 nodesep=0.6;
-			";
+";
+// 			rankdir = BT;
 
 					foreach (array_keys($mentions_exts) as $ext) {
 						if ($EM_CONF[$ext]['added by t3tool']['type'] == 'Local') {
@@ -286,28 +374,32 @@ nodesep=0.6;
 
 						foreach ($dependees as $dependee => $info) {
 							// determine styles
-							$linestyle = 'solid';
+							$linestyle = 'dashed';
 							$arrow = '->';
 							$arrowstyle = 'normal';
 
 							// we have a declared dependency - all is fine ...
 							if (isset($by_depender_wo_version[$depender][$dependee])) {
-								$linestyle = 'dotted';
+								$linestyle = 'solid';
 
 								// ... except if it goes both ways !
 								if (isset($mentions[$dependee][$depender])) {
-									$linestyle = 'bold';
+//									$linestyle = 'bold';
 								}
 							}
 
 							// if it goes both ways !
 							if (isset($mentions[$dependee][$depender])) {
-								$linestyle = 'bold';
+//								$linestyle = 'bold';
 							}
 
 							$output .= "  $depender $arrow $dependee [label=\"$info\" style=\"$linestyle\"];\n";
 						}
 					}
+					$output .= "      subgraph cluster_legend {
+depender [shape=box,pos=\"3000,3000\"];\n dependee [shape=box];\n depender -> dependee [label=\"filetypes (mentions count)\" style=\"solid\"];\n";
+					$output .= "  mentioner [shape=box];\n mentioned [shape=box];\n mentioner -> mentioned [label=\"filetypes (mentions count)\" style=\"dashed\"];\n";
+					$output .= "}";
 					$output .= "}
 				";
 
@@ -319,25 +411,6 @@ nodesep=0.6;
 					}
 				}
 
-				break;
-			//
-			//
-			//
-			case 'available' :
-				foreach ($EM_CONF as $extkey => $config) {
-					if (!$ext || preg_match("/$ext/", $extkey) || preg_match("/$ext/", $config['title'])) {
-						$extdata = array(
-							'key' => $extkey,
-							'title' => $config['title'],
-							'version' => $config['version'],
-							'type' => $config['added by t3tool']['type'],
-							'installed' => in_array($extkey, $exts) ? 'installed' : '',
-						);
-						$extlist[] = $extdata;
-					}
-				}
-				echo "Available extensions:\n";
-				return sendAsFlatTable($extlist);
 				break;
 
 			#
@@ -387,7 +460,7 @@ nodesep=0.6;
 
 
 				output_ok();
-				t3tool_cc_config();
+				t3tool_cc_code();
 				break;
 
 			case 'uninstall' :
@@ -412,7 +485,7 @@ nodesep=0.6;
 
 				}
 				echo "ok.\n";
-				t3tool_cc_config();
+				t3tool_cc_code();
 				break;
 
 
@@ -473,7 +546,7 @@ nodesep=0.6;
 						}
 					}
 
-					echo "digraph extension_dependencies {
+					$output = "digraph extension_dependencies {
 			size =\"60,60\";
 			rankdir = BT;
 			sep=\"+25,25\";
@@ -483,9 +556,9 @@ nodesep=0.6;
 
 					foreach (array_keys($exts) as $ext) {
 						if ($EM_CONF[$ext]['added by t3tool']['type'] == 'Local') {
-							echo "  $ext [shape=box];\n";
+							$output .= "  $ext [shape=box];\n";
 						} else {
-							echo "  $ext [shape=box];\n";
+							$output .= "  $ext [shape=box];\n";
 						}
 					}
 
@@ -496,12 +569,19 @@ nodesep=0.6;
 								$depender_version = $m[2];
 							}
 
-							echo "  $depender -> $dependee [label=\"$depender_version\"];\n";
+							$output .= "  $depender -> $dependee [label=\"$depender_version\"];\n";
 						}
 					}
-					echo "}";
+					$output .= "}";
 
+					$outputFile = getOption('output');
+					if ($outputFile) {
+						file_put_contents($outputFile, $output);
+					} else {
+						echo $output;
+					}
 				}
+
 
 				break;
 			case 'conflicts' :
@@ -552,98 +632,46 @@ nodesep=0.6;
 
 				break;
 
-
-			case 'report' :
-				$projects = array();
-
-				foreach ($EM_CONF as $extKey => $info) {
-
-					$project = array(
-						'extension' => $extKey,
-						'installed' => $info['version'],
-						'latest' => '',
-						'type' => $info['added by t3tool']['type'],
-						'status' => '',
-
-					);
-
-					if (in_array($filter, array(
-							'local',
-							'system',
-							'global'
-						)) && $filter != strtolower($project['type'])
-					) {
-						continue;
-					}
-
-					if ($project['type'] != 'Local' || isInTer($extKey)) {
-						$secureVersion = getSecureVersion($extKey, $info['version']);
-						$latestVersion = getLatestVersion($extKey, $info['version']);
-
-						$project['latest'] = $latestVersion;
-
-						$projectUpdate = $latestVersion != $info['version'];
-						$projectSecurity = $secureVersion != $info['version'];
-
-
-						if ($projectUpdate) {
-							$project['status'] = 'Update';
-						}
-						if ($projectSecurity) {
-							$project['status'] = 'SECURITY update';
-						}
-					} else {
-						$project['status'] = 'Not in TER';
-
-					}
-
-					$siteUpdate |= $projectUpdate;
-					$siteSecurity |= $projectSecurity;
-
-					$projects[] = $project;
-
-				}
-
-				return sendAsFlatTable($projects);
-
-
-				break;
-
 			default :
 		}
 	}
 
 
 	function isInTer($extKey) {
-		global $TYPO3_DB;
-		$intVer = convertVersionNumberToInteger($curVersion);
-		$res = sql_query('SELECT * FROM cache_extensions WHERE extkey = "' . $extKey . '"');
-		if ($row = sql_fetch_assoc($res)) {
-			return TRUE;
+		if ($GLOBALS['version_4']) {
+			global $TYPO3_DB;
+			$intVer = convertVersionNumberToInteger($curVersion);
+			$res = sql_query('SELECT * FROM cache_extensions WHERE extkey = "' . $extKey . '"');
+			if ($row = sql_fetch_assoc($res)) {
+				return TRUE;
+			}
 		}
-
 		return FALSE;
 	}
 
 	function getSecureVersion($extKey, $curVersion) {
-		global $TYPO3_DB;
-		$intVer = convertVersionNumberToInteger($curVersion);
-		$res = sql_query('SELECT * FROM cache_extensions WHERE extkey = "' . $extKey . '" AND reviewstate = 0 AND intversion > ' . $intVer . ' AND (SELECT intversion FROM cache_extensions WHERE extkey = "' . $extKey . '" AND reviewstate = -1 AND intversion = ' . $intVer . ') ORDER BY intversion LIMIT 1');
-		if ($row = sql_fetch_assoc($res)) {
-			return $row['version'];
+		if ($GLOBALS['version_4']) {
+			global $TYPO3_DB;
+			$intVer = convertVersionNumberToInteger($curVersion);
+			$res = sql_query('SELECT * FROM cache_extensions WHERE extkey = "' . $extKey . '" AND reviewstate = 0 AND intversion > ' . $intVer . ' AND (SELECT intversion FROM cache_extensions WHERE extkey = "' . $extKey . '" AND reviewstate = -1 AND intversion = ' . $intVer . ') ORDER BY intversion LIMIT 1');
+			if ($row = sql_fetch_assoc($res)) {
+				return $row['version'];
+			}
 		}
 
 		return $curVersion;
 	}
 
-	function getLatestVersion($extKey, $curVersion) {
-		global $TYPO3_DB;
-		$intVer = convertVersionNumberToInteger($curVersion);
-		$res = sql_query('SELECT * FROM cache_extensions WHERE extkey = "' . $extKey . '" AND reviewstate = 0 AND intversion > ' . $intVer . ' AND (SELECT intversion FROM cache_extensions WHERE extkey = "' . $extKey . '" AND reviewstate = -1 AND intversion = ' . $intVer . ') ORDER BY intversion LIMIT 1');
-		if ($row = sql_fetch_assoc($res)) {
-			return $row['version'];
-		}
 
+	function getLatestVersion($extKey, $curVersion) {
+		if ($GLOBALS['version_4']) {
+			global $TYPO3_DB;
+			$intVer = convertVersionNumberToInteger($curVersion);
+			$res = sql_query('SELECT * FROM cache_extensions WHERE extkey = "' . $extKey . '" AND reviewstate = 0 AND intversion > ' . $intVer . ' AND (SELECT intversion FROM cache_extensions WHERE extkey = "' . $extKey . '" AND reviewstate = -1 AND intversion = ' . $intVer . ') ORDER BY intversion LIMIT 1');
+			if ($row = sql_fetch_assoc($res)) {
+				return $row['version'];
+			}
+		}
 		return $curVersion;
 	}
 
@@ -672,38 +700,47 @@ nodesep=0.6;
 
 	function t3tool_ext_usage_short() {
 		return ('Extension commands:
-  t3tool ext list - List installed extensions
-  t3tool show - Show info of extension
-  t3tool ext config - Show config of extension
-  t3tool ext dependencies - Show dependency information for all extensions
+  t3tool ext list
+    List installed extensions
+  t3tool ext show
+    Show info of extension
+  t3tool ext dependencies
+    Show dependency information for all extensions
 ');
 
 	}
 
 	function t3tool_ext_usage_long() {
-		$bold=`tput bold`;
-		$normal=`tput sgr0`;
 
 		return ('Extension commands:
   t3tool ext list <part of extension key>
     List installed extensions
-  t3tool show <part of extension key>
-    Show info of extension
-  t3tool ext dependencies - Show dependency information for all extensions
+  t3tool show <extension key>
+    Show extension detail
+  t3tool ext dependencies [<extension key>] [<extension key>]
+  	Show dependency information for all extensions. If a single extension key is provided, dependencies will be limited to
+  	those involving that extension (either way). If an additional extension key is provided, they will be limited to depen
+  t3tool ext mentions
+    Show which extensions mentions other extensions in their code. If a single extension key is provided, mentions will be limited to
+  	those involving that extension (either way). If an additional extension key is provided, they will be further limited to only mentions
+  	of the last one, by the first one.
+
 Options :
+   Default is that only local, installed extensions will be shown. The following options will change that :
     --inactive
       Include inactive (not installed) extensions.
     --system
       Include system extensions.
-
-    --only-inactive
-      Show only inactive (not installed) extensions
-    --only-system
+    --include=<list of extension keys>
+      Include extensions that would otherwise not be handled.
+    --exclude=<list of extension keys>
+      Exclude specific extensions. Overrides all of the above.
 
 Special options for commands dependencies and mentions
     --to-inactive
-    
+
     --to-system
+    --dot
 
 ');
 
@@ -715,14 +752,10 @@ Special options for commands dependencies and mentions
 	function t3tool_ext_completion() {
 		return array(
 			"ext" => array(
-				'available' => 1,
 				'dependencies' => 1,
 				'install' => 't3tool_ext_completion_exts',
-				'installed' => 1,
 				'list' => 1,
-				'mentions' => 't3tool_ext_completion_exts',
-				'notinstalled' => 1,
-				'report' => 1,
+				'mentions' => 't3tool_ext_completion_exts,t3tool_ext_completion_exts',
 				'show' => 't3tool_ext_completion_exts',
 				'uninstall' => 't3tool_ext_completion_exts',
 

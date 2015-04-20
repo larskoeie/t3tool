@@ -16,29 +16,42 @@
     $cmd = strtolower(array_shift($args));
     $query = trim(strtolower($args[0]));
 
+    $tasks = getRecordsByString('tx_scheduler_task', $query, array('serialized_task_object'), 'uid, disable, nextexecution, lastexecution_time, serialized_task_object, serialized_executions');
+    foreach ($tasks as $i=>$task) {
+      $tasks[$i]['nextexecution'] = strftime('%d.%m.%Y %H.%M', $tasks[$i]['nextexecution']);
+      $tasks[$i]['lastexecution_time'] = strftime('%d.%m.%Y %H.%M', $tasks[$i]['lastexecution_time']);
+      if ($task['serialized_task_object']) {
+        $obj = @unserialize($task['serialized_task_object']);
+        if (is_object($obj)) {
+          $arr = get_object_vars($obj);
+          $tasks[$i]['classname'] = $arr['__PHP_Incomplete_Class_Name'];
+          $tasks[$i]['commandIdentifier'] = $arr['commandIdentifier'];
+        }
+//        unset($tasks[$i]['serialized_task_object']);
+      }
+      $executions = array();
+      if ($task['serialized_executions']) {
+        $exec = @unserialize($task['serialized_executions']);
+        foreach ($exec as $e) {
+          $executions[] = strftime('%d.%m.%Y %H.%M', $e);
+
+        }
+      }
+      $tasks[$i]['running'] = implode(',', $executions);
+      unset($tasks[$i]['serialized_executions']);
+    }
+
     switch ($cmd) {
 
       //
       // List users
       //
       case 'list' :
-        $tasks = getRecordsByString('tx_scheduler_task', $query, array('classname'), 'uid, disable, classname, nextexecution, lastexecution_time, serialized_task_object');
 
         if (!$tasks) {
           return("No matching tasks.\n");
         }
 
-        foreach ($tasks as $i=>$task) {
-          $tasks[$i]['nextexecution'] = strftime('%d.%m.%Y %H.%M', $tasks[$i]['nextexecution']);
-          $tasks[$i]['lastexecution_time'] = strftime('%d.%m.%Y %H.%M', $tasks[$i]['lastexecution_time']);
-          if ($task['serialized_task_object']) {
-            $obj = @unserialize($task['serialized_task_object']);
-            $arr = get_object_vars($obj);
-            $tasks[$i]['classname'] = $arr['__PHP_Incomplete_Class_Name'];
-            $tasks[$i]['commandIdentifier'] = $arr['commandIdentifier'];
-            unset($tasks[$i]['serialized_task_object']);
-          }
-        }
         return sendAsFlatTable($tasks);
         break;
 
@@ -101,6 +114,20 @@
 
         break;
 
+      case 'stop' :
+        if (sizeof($tasks)) {
+          foreach ($tasks as $task) {
+            if (! $task['running']) {
+              continue;
+            }
+            output_cmd('Stopping task ' . $task['classname']);
+            sql_query('update tx_scheduler_task set serialized_executions="" where uid= ' . $task['uid']);
+            output_ok();
+
+          }
+        }
+        break;
+
       //
       // Delete single task.
       //
@@ -145,6 +172,8 @@
     Enable single task.
   t3tool task disable <classname or uid>
     Disable single task.
+  t3tool task stop <uid or *>
+    Stop
   t3tool task delete <classname or uid>
     Delete single task. NO going back !
     ");
@@ -156,6 +185,10 @@
    */
   function t3tool_task_completion () {
     return array(
+      'task' => array(
+        'list' => 1,
+        'stop' => 1,
+      )
 
     );
 
