@@ -39,11 +39,33 @@
         t3tool_cc_code();
         break;
 
+      // clear all cache placed in db
       case 'db' :
         t3tool_cc_db();
         break;
 
-      // Empty typo3temp/pics.
+      case 'core' :
+      case 'ext_localconf' :
+        break;
+      case 'ext_tables' :
+            break;
+      case 'classloader' :
+            break;
+
+      case 'tca' :
+            break;
+
+      case 'fluid' :
+            break;
+
+      case 'classes' :
+            break;
+      case 'l10n' :
+            break;
+
+      case 'sprites' :
+
+        // Empty typo3temp/pics.
       case 'pics' :
         break;
 

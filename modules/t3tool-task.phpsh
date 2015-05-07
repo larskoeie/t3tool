@@ -22,12 +22,12 @@
       $tasks[$i]['lastexecution_time'] = strftime('%d.%m.%Y %H.%M', $tasks[$i]['lastexecution_time']);
       if ($task['serialized_task_object']) {
         $obj = @unserialize($task['serialized_task_object']);
-        if (is_object($obj)) {
+        if (gettype($obj) == 'object') {
           $arr = get_object_vars($obj);
           $tasks[$i]['classname'] = $arr['__PHP_Incomplete_Class_Name'];
           $tasks[$i]['commandIdentifier'] = $arr['commandIdentifier'];
         }
-//        unset($tasks[$i]['serialized_task_object']);
+        unset($tasks[$i]['serialized_task_object']);
       }
       $executions = array();
       if ($task['serialized_executions']) {

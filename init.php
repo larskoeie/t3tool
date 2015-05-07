@@ -100,14 +100,14 @@
     $GLOBALS['version_4'] = is_file(PATH_typo3conf . 'localconf.php');
     $GLOBALS['version_6'] = is_file(PATH_typo3conf . 'LocalConfiguration.php');
 
-    readConf();
+    t3tool_read_conf();
 
     // if called from bash_completion, leave early
     if ($argv[1] == '_complete') {
         die(getTabCompleteString($argv[2], $argv[3]));
     }
 
-    buildTCA();
+    t3tool_build_tca();
 
 
     // part of TCA

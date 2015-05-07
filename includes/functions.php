@@ -127,7 +127,7 @@ Options:
 	/**
 	 * Build the TCA and store it in global var.
 	 */
-	function buildTCA() {
+	function t3tool_build_tca() {
 		$tca = include(PATH_script . 'includes/tca-core-6-1.php');
 		$tca_t3tool = array();
 		if (file_exists('includes/tca-t3tool.php')) {
@@ -139,7 +139,7 @@ Options:
 	/**
 	 * Read TYPO3 configuration and store it in global var.
 	 */
-	function readConf() {
+	function t3tool_read_conf() {
 		global $TYPO3_CONF_VARS;
 
 		if ($GLOBALS['version_4']) {
@@ -579,26 +579,6 @@ Options:
 	}
 
 	/**
-	 * @param $items array
-	 * @return array
-	 */
-	function getItemList ($items) {
-
-		$include = getOption('include');
-		$exclude = getOption('exclude');
-
-		if ($include) {
-			return array_intersect($items, explode(',', $include));
-		}
-
-		if ($exclude) {
-			$items = array_diff($items, explode(',', $exclude));
-		}
-
-		return $items;
-	}
-
-	/**
 	 * Returns records from table that match q in one of the fields.
 	 *
 	 * @param       $table
@@ -607,7 +587,7 @@ Options:
 	 *
 	 * @return array|bool Array of records or FALSE if no records
 	 */
-	function getRecordsByString($table, $q = '', $fields = array(), $selectFields = '*', $orderby = '', $limit = 0) {
+	function t3tool_get_records_by_string($table, $q = '', $fields = array(), $selectFields = '*', $orderby = '', $limit = 0) {
 		$q = strtolower($q);
 
 		if ($table == 'pages') {
@@ -681,7 +661,7 @@ Options:
 	 * @param $q
 	 */
 	function getSingleRecordByString($table, $q, $fields = array()) {
-		$matches = getRecordsByString($table, $q, $fields);
+		$matches = t3tool_get_records_by_string($table, $q, $fields);
 		$matchcount = sizeof($matches);
 
 		if ($matchcount == 1) {

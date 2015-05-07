@@ -25,7 +25,7 @@
 	 */
 	function t3tool_ext_handlecmd($args) {
 
-		readConf();
+		t3tool_read_conf();
 		$cmd = array_shift($args);
 		$ext = trim(strtolower($args[0]));
 
@@ -34,6 +34,8 @@
 		$local = getFlag('l');
 
 		$stripped_ext = str_replace('_', '', $ext);
+
+		output_cmd('Building list of extensions and dependencies');
 
 		if ($GLOBALS['version_4']) {
 			$exts = explode(',', $GLOBALS['TYPO3_CONF_VARS']['EXT']['extList']);
@@ -156,8 +158,48 @@
 		ksort($by_depender);
 		ksort($by_dependee);
 
+		output_ok();
 
 		switch ($cmd) {
+
+			case 'analyse' :
+
+				if (! $ext) {
+
+				}
+
+				$data =
+					@file_get_contents($EM_CONF[$ext]['added by t3tool']['path'] . $ext . '/ext_localconf.php') .
+					@file_get_contents($EM_CONF[$ext]['added by t3tool']['path'] . $ext . '/ext_tables.php') ;
+
+				$functions = array(
+					'addStaticFile',
+					'addModule',
+					'addPageTSConfig',
+					'addUserTSConfig',
+					'addTCAcolumns',
+					'addToAllTCAtypes',
+					'registerModule',
+
+				);
+
+				foreach ($searches as $pattern) {
+					if (preg_match_all('/' . $pattern . '/U', $data, $matches, PREG_SET_ORDER)) {
+						print_r($matches);
+
+					}
+
+				}
+
+				if (preg_match_all('/\$((GLOBALS)|(TCA)|(TYPO3_CONF_VARS)).+=.+;/U', $data, $matches)) {
+					foreach ($matches[0] as $m) {
+						echo "$m\n";
+
+					}
+
+				}
+
+				break;
 
 			//
 			// List of installed extensions
@@ -233,7 +275,6 @@
 				$to = trim(strtolower($args[1]));
 				$to = $to ? explode(',', $to) : NULL;
 
-				$showOnlyExts = getItemList($exts);
 
 				// make list of strings to search for
 				foreach ($EM_CONF as $_EXTKEY => $config) {
@@ -253,7 +294,6 @@
 						!in_array($_EXTKEY, $exclude)
 
 					) {
-						output_cmd('Checking ' . $_EXTKEY);
 
 						$path = $EM_CONF[$_EXTKEY]['added by t3tool']['path'] . $_EXTKEY;
 						foreach ($prefixes as $dependee => $temp) {
@@ -275,6 +315,11 @@
 							}
 
 							if ($dependee != $_EXTKEY) {
+								if ($_EXTKEY != $__EXTKEY) {
+									output_cmd('Searching ' . $_EXTKEY);
+									$__EXTKEY = $_EXTKEY;
+								}
+
 								foreach ($temp as $prefix) {
 									$command = "cd $path; ";
 									$command .= 'grep -rni --exclude="composer.json" --exclude="ext_emconf.php"';
@@ -312,11 +357,10 @@
 													$_filepath = $filepath;
 												}
 												$report .= "\n    $linenum_padded : $line";
-												$fileextensions[$m[1]] = TRUE;
+												$fileextensions[$fileextension] = TRUE;
 
-												if (TRUE) {
-													$command = "cd $path; git blame -L $linenum,$linenum $filepath";
-													echo $command;
+												if (getOption('git')) {
+													$command = "cd $path; if [ -a .git ]; then git blame -L $linenum,$linenum $filepath; fi";
 													$output = array();
 													exec($command, $output);
 													$report .= "\n      " . $output[0] . "\n";
@@ -330,11 +374,11 @@
 									}
 
 								}
+								output_ok();
 
 							}
 
 						}
-						output_ok();
 					}
 				}
 
