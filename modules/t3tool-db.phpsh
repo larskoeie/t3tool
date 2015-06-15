@@ -72,6 +72,17 @@ function t3tool_db_handlecmd($args) {
 
 }
 
+	function t3tool_db_usage_short () {
+		return 'DB commands :
+  t3tool db login
+    Show MySQL command ("mysql -uuser -ppassword database")
+  t3tool db tail <table>
+    Like "tail", but on a table
+
+';
+
+	}
+
 /**
  * @return array
  */

@@ -10,7 +10,7 @@
   */
   $tca = array(
     'pages' => array(
-      'ctrl'
+      'ctrl' => array(),
       'columns' => array(
         'title' => array(
           'insertOnly' => TRUE,

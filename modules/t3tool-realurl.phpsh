@@ -25,19 +25,19 @@ function t3tool_realurl_handlecmd($args)
         //
         case 'search' :
             $out .= "tx_realurl_pathcache :\n";
-            $records = getRecordsByString('tx_realurl_pathcache', $q, array('pagepath'));
+            $records = t3tool_get_records_by_string('tx_realurl_pathcache', $q, array('pagepath'));
             $out .= sendAsFlatTableWithoutPaths($records);
 
             $out .= "tx_realurl_redirects :\n";
-            $records = getRecordsByString('tx_realurl_redirects', $q, array('url', 'destination'));
+            $records = t3tool_get_records_by_string('tx_realurl_redirects', $q, array('url', 'destination'));
             $out .= sendAsFlatTableWithoutPaths($records);
 
             $out .= "tx_realurl_urlencodecache :\n";
-            $records = getRecordsByString('tx_realurl_urlencodecache', $q, array('url_hash', 'content', 'page_id'));
+            $records = t3tool_get_records_by_string('tx_realurl_urlencodecache', $q, array('url_hash', 'content', 'page_id'));
             $out .= sendAsFlatTableWithoutPaths($records);
 
             $out .= "tx_realurl_urldecodecache :\n";
-            $records = getRecordsByString('tx_realurl_urldecodecache', $q, array('url_hash', 'spurl', 'page_id'));
+            $records = t3tool_get_records_by_string('tx_realurl_urldecodecache', $q, array('url_hash', 'spurl', 'page_id'));
             $out .= sendAsFlatTableWithoutPaths($records);
 
             return $out;

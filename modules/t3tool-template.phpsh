@@ -48,7 +48,7 @@ function t3tool_template_handlecmd($args)
             if (!trim($id)) {
                 return ("Usage : t3tool template show <title or uid>. Case insensitive.\n");
             }
-            $tpl = getSingleRecordByString("sys_template", $id, array('title'));
+            $tpl = t3tool_get_single_record_by_string("sys_template", $id, array('title'));
             return sendRecordAsTable($tpl);
             break;
 
@@ -65,7 +65,7 @@ function t3tool_template_handlecmd($args)
                 output_usage("Usage : t3tool template set <key> <value> <pid> \n");
             }
 
-            $page = getSingleRecordByString('pages', $pid);
+            $page = t3tool_get_single_record_by_string('pages', $pid);
             $pid = $page['uid'];
 
             output_cmd("Setting '$key' to '$value' on page '" . $page['title'] . "'... ");
@@ -94,7 +94,7 @@ function t3tool_template_handlecmd($args)
                 output_usage("Usage : t3tool template const-set <key> <value> <pid> \n");
             }
 
-            $page = getSingleRecordByString('pages', $pid);
+            $page = t3tool_get_single_record_by_string('pages', $pid);
             $pid = $page['uid'];
 
             output_cmd("Setting '$key' to '$value' on page '" . $page['title'] . "'... ");

@@ -30,6 +30,7 @@
 
     # list of activated modules
     $GLOBALS['modules'] = array(
+        'cache',
         'cc',
         'config',
         'db',

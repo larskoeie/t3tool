@@ -21,7 +21,7 @@
       // List
       //
       case 'list' :
-        $items = getRecordsByString('tx_devlog', $q, array('msg'), 'uid, crdate, msg, data_var', 'crdate desc', 50);
+        $items = t3tool_get_records_by_string('tx_devlog', $q, array('msg'), 'uid, crdate, msg, data_var', 'crdate desc', 50);
 
         if (!$items) {
           return ("No matching items.\n");
@@ -37,7 +37,7 @@
       // Show
       //
       case 'show'  :
-        $record = getSingleRecordByString('tx_devlog', $q, array('msg'), 'msg');
+        $record = t3tool_get_single_record_by_string('tx_devlog', $q, array('msg'), 'msg');
 
         if (!$record) {
           return ("No matching items.\n");

@@ -16,7 +16,7 @@
     $cmd = strtolower(array_shift($args));
     $query = trim(strtolower($args[0]));
 
-    $tasks = getRecordsByString('tx_scheduler_task', $query, array('serialized_task_object'), 'uid, disable, nextexecution, lastexecution_time, serialized_task_object, serialized_executions');
+    $tasks = t3tool_get_records_by_string('tx_scheduler_task', $query, array('serialized_task_object'), 'uid, disable, nextexecution, lastexecution_time, serialized_task_object, serialized_executions');
     foreach ($tasks as $i=>$task) {
       $tasks[$i]['nextexecution'] = strftime('%d.%m.%Y %H.%M', $tasks[$i]['nextexecution']);
       $tasks[$i]['lastexecution_time'] = strftime('%d.%m.%Y %H.%M', $tasks[$i]['lastexecution_time']);
@@ -62,7 +62,7 @@
         if (!trim($query)) {
           return("Usage : t3tool task show <classname or uid>. Case insensitive.\n");
         }
-        $task = getSingleRecordByString('tx_scheduler_task', $query, array('classname'));
+        $task = t3tool_get_single_record_by_string('tx_scheduler_task', $query, array('classname'));
         if ($task['serialized_task_object']) {
           $obj = @unserialize($task['serialized_task_object']);
           $arr = get_object_vars($obj);
@@ -73,7 +73,6 @@
 
 
         return sendRecordAsTable($task);
-        print_r($arr);
         break;
 
       //
@@ -83,7 +82,7 @@
         if (!trim($query)) {
           return("Usage : t3tool task enable <classname or uid>. Case insensitive.\n");
         }
-        $task = getSingleRecordByString('tx_scheduler_task', $query, array('classname'));
+        $task = t3tool_get_single_record_by_string('tx_scheduler_task', $query, array('classname'));
 
         if ($task['disable'] == 0) {
           return($task['classname'] . " already enabled.\n");
@@ -102,7 +101,7 @@
         if (!trim($query)) {
           return("Usage : t3tool task disable <classname or uid>. Case insensitive.");
         }
-        $task = getSingleRecordByString('tx_scheduler_task', $query, array('classname'));
+        $task = t3tool_get_single_record_by_string('tx_scheduler_task', $query, array('classname'));
 
         if ($task['disable'] == 1) {
           return($task['classname'] . " already disabled.\n");
@@ -135,21 +134,12 @@
         if (!trim($query)) {
           return("Usage : t3tool task delete <classname or uid>. Case insensitive.");
         }
-        $task = getSingleRecordByString('tx_scheduler_task', $query, array());
+        $task = t3tool_get_single_record_by_string('tx_scheduler_task', $query, array());
 
         sql_query("delete from tx_scheduler_task where uid =  " . $task['uid'] . " limit 1");
         echo $task['uid'] . " deleted.\n";
         break;
 
-        return("t3tool task list [<classname or uid>]
-    List all tasks.
-  t3tool task enable <classname or uid>
-    Enable single task.
-  t3tool task disable <classname or uid>
-    Disable single task.
-  t3tool task delete <classname or uid>
-    Delete single task. NO going back !
-    ");
 
     }
   }

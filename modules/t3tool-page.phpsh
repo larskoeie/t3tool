@@ -28,7 +28,7 @@
         if (!trim($title)) {
           return("Usage : t3tool page show <title or uid>. Case insensitive.\n");
         }
-        $page = getSingleRecordByString('pages', $title, array('title'));
+        $page = t3tool_get_single_record_by_string('pages', $title, array('title'));
         return sendRecordAsTable($page);
         break;
 

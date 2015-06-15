@@ -21,14 +21,15 @@
 
 			//
 			//
+			default :
 			case 'list' :
 
-				$items = getRecordsByString('fe_session_data');
+ 				$items = t3tool_get_records_by_string('fe_session_data');
 				return sendAsFlatTable($items);
 
 			case 'show' :
 
-				$item = getRecordsByString('fe_session_data', $q, array('hash'));
+				$item = t3tool_get_records_by_string('fe_session_data', $q, array('hash'));
 				return sendRecordAsTable($item);
 
 

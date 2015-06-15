@@ -17,11 +17,11 @@
 		$cmd = array_shift($args);
 
 
-		$domains = getRecordsByString('sys_domain', '', array(), 'uid, pid, domainName, hidden');
+		$domains = t3tool_get_records_by_string('sys_domain', '', array(), 'uid, pid, domainName, hidden');
 
 		$domain = trim(strtolower($args[0]));
 		if ($domain) {
-			$domains = getRecordsByString('sys_domain', $domain, array('domainName'), 'uid, pid, domainName, hidden');
+			$domains = t3tool_get_records_by_string('sys_domain', $domain, array('domainName'), 'uid, pid, domainName, hidden');
 		}
 
 		switch ($cmd) {
@@ -88,7 +88,7 @@
 			// Show a single domain with all fields.
 			//
 			case 'show' :
-				$domain = getSingleRecordByString('sys_domain', $domain, array('domainName'));
+				$domain = t3tool_get_single_record_by_string('sys_domain', $domain, array('domainName'));
 				return sendRecordAsTable($domain);
 				break;
 
@@ -103,7 +103,7 @@
 				if (!trim($pid)) {
 					return ("Usage : t3tool domain add <domainName> <pid>\n");
 				}
-				$page = getSingleRecordByString('pages', $pid);
+				$page = t3tool_get_single_record_by_string('pages', $pid);
 				$pid = $page['uid'];
 				$pagetitle = $page['title'];
 
@@ -153,7 +153,7 @@
 				if (!trim($pid)) {
 					return ("Usage : t3tool domain move <domainName or uid> <to pid>\n");
 				}
-				$page = getSingleRecordByString('pages', $pid);
+				$page = t3tool_get_single_record_by_string('pages', $pid);
 				$pid = $page['uid'];
 				$pagetitle = $page['title'];
 
@@ -167,7 +167,7 @@
 				if (!trim($domain)) {
 					return ("Usage : t3tool domain delete <domainName or uid>. Case insensitive.");
 				}
-				$domains = getRecordsByString('sys_domain', $domain, array('domainName'));
+				$domains = t3tool_get_records_by_string('sys_domain', $domain, array('domainName'));
 				foreach ($domains as $domain) {
 					if ($domain) {
 						output_cmd('Deleting ' . $domain['domainName']);
@@ -211,7 +211,7 @@
 				if (!trim($domain)) {
 					return ("Usage : t3tool domain enable <domainName or uid>. Case insensitive.\n");
 				}
-				$domains = getRecordsByString('sys_domain', $domain, array('domainName'));
+				$domains = t3tool_get_records_by_string('sys_domain', $domain, array('domainName'));
 				foreach ($domains as $domain) {
 					if ($domain['hidden'] == 0) {
 						output_info($domain['domainName'] . " already enabled.\n");
@@ -230,7 +230,7 @@
 				if (!trim($domain)) {
 					return ("Usage : t3tool domain movetotop <domainName or uid>. Case insensitive.\n");
 				}
-				$domain = getSingleRecordByString('sys_domain', $domain, array('domainName'));
+				$domain = t3tool_get_single_record_by_string('sys_domain', $domain, array('domainName'));
 
 				output_cmd("Moving " . $domain['domainName'] . " to top");
 				sql_query("update sys_domain set sorting=sorting+1");

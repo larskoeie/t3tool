@@ -10,7 +10,7 @@
 
     $cmd = strtolower(array_shift($args));
     $key = trim(($args[0]));
-    $local = getFlag('l');
+    $local = getOption('l');
 
     $exists = getLocalConf($key) != NULL;
 

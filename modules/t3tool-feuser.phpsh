@@ -16,7 +16,7 @@ function t3tool_feuser_handlecmd($args)
 {
     $cmd = strtolower(array_shift($args));
     $username = trim($args[0]);
-    $users = getRecordsByString('fe_users', $username, array(
+    $users = t3tool_get_records_by_string('fe_users', $username, array(
         'username',
         'email'
     ));
@@ -24,7 +24,7 @@ function t3tool_feuser_handlecmd($args)
     switch ($cmd) {
         case 'list' :
         case 'find' :
-            $feusers = getRecordsByString('fe_users', $username, array('username'), 'uid, pid, username, email, disable');
+            $feusers = t3tool_get_records_by_string('fe_users', $username, array('username'), 'uid, pid, username, email, disable');
             if ($cmd == 'list') {
                 return sendAsFlatTable($feusers);
             }
@@ -69,7 +69,7 @@ function t3tool_feuser_handlecmd($args)
         // Set fe_user's password.
         //
         case 'password' :
-            $user = getSingleRecordByString('fe_users', $username, array(
+            $user = t3tool_get_single_record_by_string('fe_users', $username, array(
                 'username',
                 'email'
             ));
@@ -87,7 +87,7 @@ function t3tool_feuser_handlecmd($args)
         // List user groups
         //
         case 'groups' :
-            $groups = getRecordsByString('fe_groups', $username, array('title'), 'uid, title');
+            $groups = t3tool_get_records_by_string('fe_groups', $username, array('title'), 'uid, title');
 
             if (!$groups) {
                 return ("No matching groups.\n");
@@ -101,7 +101,7 @@ function t3tool_feuser_handlecmd($args)
         // Find a user group and show all fields
         //
         case 'showgroup' :
-            $group = getSingleRecordByString('fe_groups', $args[0], array('title'));
+            $group = t3tool_get_single_record_by_string('fe_groups', $args[0], array('title'));
             return sendRecordAsTable($group);
             break;
 
@@ -109,7 +109,7 @@ function t3tool_feuser_handlecmd($args)
         // Find members of a user group
         //
         case 'members' :
-            $group = getSingleRecordByString('fe_groups', $args[0], array('title'));
+            $group = t3tool_get_single_record_by_string('fe_groups', $args[0], array('title'));
             $users = sql_get_rows('select uid, disable, username, email from fe_users where find_in_set(' . $group['uid'] . ', usergroup)');
             return sendAsFlatTable($users);
             break;
@@ -118,11 +118,11 @@ function t3tool_feuser_handlecmd($args)
         // Add a group to a user
         //
         case 'addgroup' :
-            $user = getSingleRecordByString('fe_users', $username, array(
+            $user = t3tool_get_single_record_by_string('fe_users', $username, array(
                 'username',
                 'email'
             ));
-            $group = getSingleRecordByString('fe_groups', $args[1], array('title'));
+            $group = t3tool_get_single_record_by_string('fe_groups', $args[1], array('title'));
             $groups = array();
             if (trim($user['usergroup'])) {
                 $groups = explode(',', trim($user['usergroup']));
@@ -137,11 +137,11 @@ function t3tool_feuser_handlecmd($args)
         // Remove a group from a user
         //
         case 'rmgroup' :
-            $user = getSingleRecordByString('fe_users', $username, array(
+            $user = t3tool_get_single_record_by_string('fe_users', $username, array(
                 'username',
                 'email'
             ));
-            $group = getSingleRecordByString('fe_groups', $args[1], array('title'));
+            $group = t3tool_get_single_record_by_string('fe_groups', $args[1], array('title'));
             $groups = array_fill_keys(explode(',', trim($user['usergroup'])), TRUE);
             unset($groups[$group['uid']]);
 
@@ -155,7 +155,7 @@ function t3tool_feuser_handlecmd($args)
             if (!trim($username)) {
                 return ("Usage : t3tool feuser show <username, email or uid>. Case insensitive.\n");
             }
-            $user = getSingleRecordByString('fe_users', $username, array(
+            $user = t3tool_get_single_record_by_string('fe_users', $username, array(
                 'username',
                 'email'
             ));
@@ -170,7 +170,7 @@ function t3tool_feuser_handlecmd($args)
             if (!trim($username)) {
                 return ("Usage : t3tool feuser enable <username or uid>. Case insensitive.\n");
             }
-            $user = getSingleRecordByString('fe_users', $username, array(
+            $user = t3tool_get_single_record_by_string('fe_users', $username, array(
                 'username',
                 'email'
             ));
@@ -192,7 +192,7 @@ function t3tool_feuser_handlecmd($args)
             if (!trim($username)) {
                 return ("Usage : t3tool feuser disable <username or uid>. Case insensitive.");
             }
-            $user = getSingleRecordByString('fe_users', $username, array(
+            $user = t3tool_get_single_record_by_string('fe_users', $username, array(
                 'username',
                 'email'
             ));
@@ -214,7 +214,7 @@ function t3tool_feuser_handlecmd($args)
             if (!trim($username)) {
                 return ("Usage : t3tool feuser delete <username or uid>. Case insensitive.");
             }
-            $user = getSingleRecordByString('fe_users', $username, array(
+            $user = t3tool_get_single_record_by_string('fe_users', $username, array(
                 'username',
                 'email'
             ));

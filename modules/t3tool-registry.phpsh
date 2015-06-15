@@ -30,7 +30,7 @@
 				if ($namespace) {
 					$sql .= " and entry_namespace='$namespace'";
 				}
-				$records = getRecordsByString('sys_registry', $key, array('entry_namespace', 'entry_key'));
+				$records = t3tool_get_records_by_string('sys_registry', $key, array('entry_namespace', 'entry_key'));
 				if (!$records) {
 					return 'No records';
 				}

@@ -143,7 +143,7 @@ Options:
 		global $TYPO3_CONF_VARS;
 
 		if ($GLOBALS['version_4']) {
-			require_once('typo3conf/localconf.php');
+			require_once(PATH_typo3conf . 'localconf.php');
 			$GLOBALS['TYPO3_CONF_VARS']['DB'] = array(
 				'host' => $typo_db_host,
 				'username' => $typo_db_username,
@@ -239,6 +239,7 @@ Options:
 				print "\n  SQL error : $error\n  SQL : $sql\n";
 			}
 			if ($debug) {
+				echo "$sql\n";
 				foreach (debug_backtrace() as $bt) {
 					print $bt['function'] . ', ' . $bt['file'] . ', line ' . $bt['line'] . "\n";
 				}
@@ -588,7 +589,6 @@ Options:
 	 * @return array|bool Array of records or FALSE if no records
 	 */
 	function t3tool_get_records_by_string($table, $q = '', $fields = array(), $selectFields = '*', $orderby = '', $limit = 0) {
-		$q = strtolower($q);
 
 		if ($table == 'pages') {
 			// handle special "magic" shorthands
@@ -603,6 +603,7 @@ Options:
 
 		}
 
+		$q = strtolower($q);
 
 		if (!is_array($fields)) {
 			$fields = explode(',', $fields);
@@ -660,7 +661,7 @@ Options:
 	 * @param $fields
 	 * @param $q
 	 */
-	function getSingleRecordByString($table, $q, $fields = array()) {
+	function t3tool_get_single_record_by_string($table, $q, $fields = array()) {
 		$matches = t3tool_get_records_by_string($table, $q, $fields);
 		$matchcount = sizeof($matches);
 
@@ -783,11 +784,11 @@ Options:
 	}
 
 	/**
-	 * Convert an object to a readable string, in any way possible.
+	 * Convert any value to a readable string, in any way possible.
 	 *
 	 * @param $s
 	 */
-	function objectToString($s) {
+	function objectToString($s, $index = NULL) {
 		if (preg_match('/^A|O:[0-9]+:/i', $s)) {
 			$s = unserialize($s);
 		}
@@ -795,6 +796,17 @@ Options:
 			$s = print_r($s, 1);
 		} elseif (is_array($s)) {
 			$s = print_r($s, 1);
+		}
+
+		switch ($index) {
+			case 'crdate' :
+			case 'starttime' :
+			case 'endtime' :
+			case 'tstamp' :
+				if (preg_match('/^[0-9]{10}$/', $s)) {
+					$s = strftime('%d.%m.%Y %H.%M', $s);
+				}
+				break;
 		}
 
 		$s = preg_replace(";\n|\r\t;", ' ', $s);
@@ -1186,7 +1198,7 @@ Options:
 
 		foreach ($a as $y => $row) {
 			foreach ($row as $x => $d) {
-				$a[$y][$x] = objectToString($a[$y][$x]);
+				$a[$y][$x] = objectToString($a[$y][$x], $x);
 			}
 		}
 		foreach ($a as $y => $row) {
@@ -1227,8 +1239,8 @@ Options:
 
 					echo '| ';
 					foreach ($row as $x => $d) {
-						$a[$y][$x] = objectToString($a[$y][$x]);
-						$a[$y][$x] = str_pad($a[$y][$x], $l[$x]);
+						$a[$y][$x] = objectToString($a[$y][$x], $x);
+//						$a[$y][$x] = str_pad($a[$y][$x], $l[$x]);
 					}
 
 					echo implode(' | ', $a[$y]) . " |\n";

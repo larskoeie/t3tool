@@ -13,7 +13,7 @@
     if (!$uid){
       return ("t3tool show [table] [uid]\n");
     }
-    $record = getSingleRecordByString($table, $uid);
+    $record = t3tool_get_single_record_by_string($table, $uid);
     return sendRecordAsTable($record);
 
   }

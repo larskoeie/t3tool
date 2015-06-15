@@ -61,6 +61,10 @@
    */
   function t3tool_log_completion () {
     return array(
+      'log' => array(
+          'list' => 1,
+          'tail' => 1,
+      ),
 
     );
 
