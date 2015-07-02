@@ -21,9 +21,37 @@
 
 		switch ($cmd) {
 			case 'clear' :
-				$cache = $args[0] ?: 'all';
+				$cache = $args[0];
+				if (! trim($cache)) {
+					output_usage('Usage:
+  t3tool cache clear <cache>
+
+');
+				}
+
+
+
 
 				t3tool_cache_clear_single($cache);
+				break;
+
+			/**
+			 *
+			 */
+			case 'search' :
+				$cache = $args[0];
+				$q = $args[1];
+
+				if (! trim($q)) {
+					output_usage('Usage:
+					t3tool cache search <cache> <string>
+					');
+
+
+				}
+
+				return t3tool_cache_search_single($cache, $q);
+
 				break;
 
 			case 'stat' :
@@ -37,19 +65,23 @@
 						$out[] = array(
 							'cache' => $table,
 							'count' => $temp['count'],
+							'timestamp' => $timestamp ? dateFormat($timestamp) : '',
 						);
 					}
 				}
 
 				foreach (t3tool_cache_get_file_caches() as $cache => $dir) {
 					if (substr($dir, -1) == '*') {
-						$count = t3tool_find_cache_file($dir) ? 1 : 0;
+						$cacheFile = t3tool_find_cache_file($dir);
+						$count = $cacheFile ? 1 : 0;
+						$timestamp = filemtime(PATH_site . 'typo3temp/' . $cacheFile);
 					} else {
 						$count = t3tool_count_files_recursive(PATH_site . 'typo3temp/' . $dir);
 					}
 					$out[] = array(
 						'cache' => $cache,
 						'count' => $count,
+						'timestamp' => $timestamp ? dateFormat($timestamp) : '',
 					);
 				}
 
@@ -69,6 +101,43 @@
 
 	}
 
+	/**
+	 * @param $cache
+	 * @param $q
+	 */
+	function t3tool_cache_search_single ($cache, $q) {
+		$file_caches = t3tool_cache_get_file_caches();
+		$db_caches = t3tool_cache_get_db_caches();
+
+		if (isset($db_caches[$cache])) {
+
+			if (preg_match('/^cf_/', $cache)) {
+				if (preg_match('/_tags$/', $cache)) {
+					$matches = t3tool_get_records_by_string($cache, "*$q*", array('tag'));
+				} else {
+					$matches = t3tool_get_records_by_string($cache, "*$q*", array('content'));
+					foreach ($matches as $i=>$dummy) {
+						$matches[$i]['expires'] = dateFormat($matches[$i]['expires']);
+
+					}
+				}
+			}
+
+
+			foreach ($matches as $i => $match) {
+				$matches[$i] = t3tool_crop_and_hilite_record($match, $q);
+			}
+
+
+			return sendAsFlatTable($matches);
+		}
+
+	}
+
+
+	/**
+	 * @param $table
+	 */
 	function t3tool_cache_truncate_table($table) {
 		$res = sql_query('select * from ' . $table);
 		$rows = sql_num_rows($res);
@@ -82,6 +151,12 @@
 	function t3tool_cache_clear_single($cache) {
 		$file_caches = t3tool_cache_get_file_caches();
 		$db_caches = t3tool_cache_get_db_caches();
+
+		if ($cache == 'all') {
+			t3tool_cache_clear_single('db');
+			t3tool_cache_clear_single('file');
+			return;
+		}
 
 		if (isset($file_caches[$cache])) {
 			if (is_array($file_caches[$cache])) {
@@ -110,23 +185,28 @@
 
 		}
 
-	}
 
-	/**
-	 * Truncate all
-	 */
-	function t3tool_cache_clear_db() {
-		$tables = sql_get_rows('show tables');
-		foreach ($tables as $table) {
-			$temp = each($table);
-			$table = $temp[1];
-			if (preg_match('/^(cache)|(cf)_/', $table)) {
-				t3tool_cache_truncate_table($table);
+		if (isset($db_caches[$cache])) {
+			if ($cache == 'db') {
+				foreach (t3tool_cache_get_db_caches() as $table) {
+					if (trim($table)) {
+						t3tool_cache_truncate_table($table);
+					}
+				}
+
+				return TRUE;
 			}
-		}
+			if (is_array($cb_caches[$cache])) {
+				foreach ($cb_caches[$cache] as $temp) {
+					t3tool_cache_clear_single($temp);
+				}
+			} else {
+				t3tool_cache_truncate_table($cache);
+			}
 
-		return TRUE;
+		}
 	}
+
 
 	/**
 	 *
@@ -157,12 +237,30 @@
 
 
 	function t3tool_cache_usage_short() {
-		return ("Clear cache commands:
-  t3tool cc content - Truncates all cache tables.
-  t3tool cc code - Deletes any cached code from extensions.
-  t3tool cc all - All of the above.
-  t3tool cc db - Truncate all cache tables in DB.
-  t3tool cc pics - Empties typo3temp/pics.
+		return ("Cache commands:
+  t3tool cache clear content - Truncate all cache tables.
+  t3tool cache clear code - Delete all cached code from extensions.
+  t3tool cache clear db - Truncate all cache tables in DB.
+  t3tool cache clear all - All of the above.
+  t3tool cc pics - Empty typo3temp/pics.
+  ");
+
+	}
+
+	function t3tool_cache_usage_long () {
+		return ("Cache commands:
+  t3tool cache clear content
+    Truncates all cache tables.
+  t3tool cache clear code
+    Deletes all cached code from extensions.
+  t3tool cache clear db
+    Truncate all cache tables in DB. More specifically, truncate all tables whose name either
+      - starts with 'cf_', or
+      - contains 'cache'
+  t3tool cc all
+    All of the above.
+  t3tool cc pics
+    Empties typo3temp/pics.
   ");
 
 	}
@@ -176,6 +274,7 @@
 				'clear' => 't3tool_cache_completion_caches',
 				'list' => 't3tool_cache_completion_caches',
 				'show' => 1,
+				'search' => 't3tool_cache_completion_caches',
 				'stat' => 1,
 			),
 
@@ -306,4 +405,33 @@
 		$out = array_merge($out, t3tool_cache_get_db_caches());
 
 		return $out;
+	}
+
+	function t3tool_cache_cmdaliases () {
+		return array(
+			'cc' => 'cache clear',
+		);
+	}
+
+	/**
+	 * @param $dir
+	 * @return bool
+	 */
+	function rmdir_recursive($dir) {
+		if (!is_dir($dir)) {
+			return TRUE;
+		}
+		foreach (scandir($dir) as $file) {
+			if ('.' === $file || '..' === $file) {
+				continue;
+			}
+			if (is_dir("$dir/$file")) {
+				$count += rmdir_recursive("$dir/$file");
+			} else {
+				unlink("$dir/$file");
+				$count ++;
+			}
+		}
+		rmdir($dir);
+		return $count;
 	}

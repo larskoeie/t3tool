@@ -233,13 +233,15 @@ Options:
 		global $mysqli;
 		$res = mysqli_query($mysqli, $sql);
 		//   print "$sql\n\n";
+		if (getOption('debug')) {
+			echo "$sql\n";
+		}
 		if ($res === FALSE) {
 			$error = mysqli_error($mysqli);
 			if ($error) {
 				print "\n  SQL error : $error\n  SQL : $sql\n";
 			}
-			if ($debug) {
-				echo "$sql\n";
+			if (getOption('debug')) {
 				foreach (debug_backtrace() as $bt) {
 					print $bt['function'] . ', ' . $bt['file'] . ', line ' . $bt['line'] . "\n";
 				}
@@ -457,21 +459,55 @@ Options:
 	/**
 	 * Crops the string around the search query and hilite the query within the string.
 	 *
-	 * @todo : at this point, actually only crops
 	 * @param $s
 	 * @param $q
 	 *
 	 * @return string
 	 */
 	function cropAndHilite($s, $q) {
+		$before_len = 10;
+		$after_len = 10;
+
+		$out = '';
+
+		$q_preg = str_replace(array('*', '?'), array('.*', '.'), $q);
+		if (preg_match("/$q_preg/Ui", $s, $m)) {
+			$q = $m[0];
+		}
+
 		$a = strpos($s, $q);
 		if ($a === FALSE) {
 			return '';
 		}
-		$a = max(0, $a - 10);
-		$l = min($a + strlen($q) + 20, strlen($s));
+		$a = max(0, $a - $before_len);
+		$before = substr($s, $a, $before_len);
+		$match = substr($s, $a + $before_len, strlen($q));
+		$after = substr($s, $a + $before_len + strlen($q), $after_len);
 
-		return substr($s, $a, $l - $a);
+		$l = min($a + strlen($q) + $before_len + $after_len, strlen($s));
+
+		if ($a > 0) {
+			$out .= '... ';
+		}
+		$out .= $before . "\x1b[43m" . $match . "\x1b[49m" . $after;
+		if ($a + strlen($q) + $before_len + $after_len < strlen($s)) {
+			$out .= ' ...';
+		}
+
+		return $out;
+	}
+
+	/*
+	 * If field matches, replace it with the cropped and hilited version
+	 */
+	function t3tool_crop_and_hilite_record ($record, $q) {
+		$q_preg = str_replace(array('*', '?'), array('.*', '.'), $q);
+		foreach ($record as $field => $value) {
+			if (preg_match('/' . $q_preg . '/', $value)) {
+				$record[$field] = cropAndHilite($value, $q);
+			}
+		}
+		return $record;
 	}
 
 
@@ -762,7 +798,7 @@ Options:
 	 *
 	 * @return string
 	 */
-	function crop($s, $l = 50) {
+	function crop($s, $l = 100) {
 		if (getOption('full')) {
 			return $s;
 		}
@@ -792,7 +828,7 @@ Options:
 		if (preg_match('/^A|O:[0-9]+:/i', $s)) {
 			$s = unserialize($s);
 		}
-		if (is_object($s)) {
+		if (gettype($s) == 'object') {
 			$s = print_r($s, 1);
 		} elseif (is_array($s)) {
 			$s = print_r($s, 1);
@@ -804,7 +840,7 @@ Options:
 			case 'endtime' :
 			case 'tstamp' :
 				if (preg_match('/^[0-9]{10}$/', $s)) {
-					$s = strftime('%d.%m.%Y %H.%M', $s);
+					$s = dateFormat($s);
 				}
 				break;
 		}
@@ -814,6 +850,42 @@ Options:
 
 		return $s;
 	}
+
+	/**
+	 * @param $unix
+	 * @return string
+	 */
+	function dateFormat ($unix) {
+		switch (getOption('date')) {
+			case 'age' :
+			case 'relative' :
+				$diff = time() - $unix;
+				if ($diff > 0) {
+					return dateFormatInterval($diff) . ' ago';
+				} else {
+					return 'in ' . dateFormatInterval(-$diff);
+				}
+				break;
+
+		}
+		return strftime('%d.%m.%Y %H:%M', $unix);
+	}
+
+	/**
+	 * @param $seconds
+	 * @return string
+	 */
+	function dateFormatInterval ($seconds) {
+		if ($seconds > 3600) {
+			return floor($seconds / 3600) . ' hrs.';
+		}
+		if ($seconds > 60) {
+			return floor($seconds / 60) . ' min.';
+		}
+		return $seconds . ' sec.';
+
+	}
+
 
 	/**
 	 * Format an array of records as a table with headers on top.
@@ -1427,6 +1499,7 @@ Options:
 		return FALSE;
 	}
 
+
 	/**
 	 *
 	 */
@@ -1444,4 +1517,40 @@ Options:
 
 			return $s;
 		}
+	}
+
+
+
+	/**
+	 * Calls the internal extension t3tool
+	 *
+	 */
+	function t3tool_call_internal_ext_t3tool($cmd) {
+		$output = array();
+		exec('cd ' . PATH_script . 'lib/typo3/; typo3/cli_dispatch.phpsh t3tool ' . $cmd, $output);
+		return implode("\n", $output);
+
+	}
+
+	/**
+	 * Looks in current working dir (which might not be getcwd() at this point, and in site root.
+	 *
+	 * @param $file
+	 * @return string
+	 */
+	function t3tool_get_absolute_file_path ($file) {
+
+		if (file_exists($file)) {
+			return $file;
+		}
+
+		if (file_exists(PATH_cwd . $file)) {
+			return PATH_cwd . $file;
+		}
+
+		if (file_exists(PATH_site . $file)) {
+			return PATH_site . $file;
+		}
+
+		return '';
 	}

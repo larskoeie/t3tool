@@ -1,0 +1,22 @@
+a.typo3-csh-link span.typo3-csh-inline{display:none}
+a.typo3-csh-link:hover span.typo3-csh-inline{display:block}
+.t3-help-link span.t3-help-inline{display:none}
+a.t3-help-link:hover span.t3-help-inline{display:block}
+div#typo3-docbody{bottom:0;overflow:auto;position:absolute;top:51px;width:100%}
+iframe{width:100%}
+#typo3-side-menu,iframe{height:100%;overflow:auto}
+@media print{div#typo3-docbody{overflow:visible}
+}
+#typo3-logo{float:left}
+a img{border:none}
+span.t3-icon{display:inline-block;position:relative;overflow:hidden}
+.t3-icon{background-image:url('../../typo3/gfx/icon_fatalerror.gif');background-repeat:no-repeat;width:16px;height:16px;font-size:1px;line-height:0}
+.t3-icon .c-inputButton{width:16px;height:16px}
+.typo3-newRecord-treeline{padding-right:20px}
+.typo3-newRecord-treeline img{vertical-align:middle}
+#typo3-newRecord tr{line-height:13px}
+/*\T1*/
+.t3-icon-extensionmanager-update-script{background-position:0px 0px !important;background-image:url('../../typo3/sysext/extensionmanager/Resources/Public/Images/Icons/ExtensionUpdateScript.png') !important}
+.t3-icon-sys_file_storage-default{background-position:0px 0px !important;background-image:url('../../typo3/gfx/i/_icon_ftp.gif') !important}
+.t3-icon-sys_filemounts-default{background-position:0px 0px !important;background-image:url('../../typo3/gfx/i/_icon_ftp.gif') !important}
+.t3-icon-backend_layout-default{background-position:0px 0px !important;background-image:url('../../typo3/gfx/i/backend_layout.gif') !important}

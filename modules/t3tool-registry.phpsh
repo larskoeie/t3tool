@@ -54,7 +54,8 @@
 					return 'No match';
 				}
 				$value = unserialize($record['entry_value']);
-				print_r($value);
+				var_dump($value);
+
 				break;
 
 			/**
@@ -103,9 +104,11 @@
 	function t3tool_registry_usage_short() {
 		return ("Registry commands:
   t3tool registry list
+    List all registry entries
   t3tool registry get [<namespace>] <key>
-
+    Show a single registry entry
   t3tool registry set <namespace> <key> <value>
+
         ");
 
 	}
@@ -116,11 +119,25 @@
 	function t3tool_registry_completion() {
 		return array(
 			'registry' => array(
-				'get' => 1,
+				'get' => 't3tool_registry_completion_keys',
 				'list' => 1,
 				'set' => 1,
 			),
 
 		);
 
+	}
+
+	/**
+	 * @return array
+	 */
+	function t3tool_registry_completion_namespaces () {
+		return sql_get_column("select entry_namespace from sys_registry group by entry_namespace");
+	}
+
+	/**
+	 * @return array
+	 */
+	function t3tool_registry_completion_keys() {
+		return sql_get_column("select entry_key from sys_registry group by entry_key");
 	}

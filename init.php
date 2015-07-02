@@ -1,5 +1,7 @@
 <?php
 
+	// store original PWD before altering it
+	define('PATH_cwd', getcwd() . '/');
 
     // find the root
     while (!is_dir('typo3conf') && !is_file('.t3tool-root') && getcwd() != '/') {
@@ -23,15 +25,25 @@
     define('PATH_typo3conf', PATH_site . 'typo3conf/');
     define('PATH_t3lib', PATH_site . 't3lib/');
 
-    error_reporting(E_ALL ^ E_NOTICE ^ E_DEPRECATED);
+	define('INDENT', "\t");
+	define('COLOR_RED', "\x1b[1;31m");
+	define('COLOR_BLUE', "\x1b[1;34m");
+	define('COLOR_ADDITION', COLOR_BLUE);
+	define('COLOR_DELETION', COLOR_RED);
+
+	define('COLOR_RESET', "\x1b[0m");
+	// @TODO : more color constants here
+
+	error_reporting(E_ALL ^ E_NOTICE ^ E_DEPRECATED);
     //  error_reporting(E_ALL);
+
+	date_default_timezone_set('UTC');
 
     require_once(PATH_script . 'includes/functions.php');
 
     # list of activated modules
     $GLOBALS['modules'] = array(
         'cache',
-        'cc',
         'config',
         'db',
         'deprecation',
@@ -52,7 +64,8 @@
         'solr',
         'user',
         'task',
-        'template'
+        'template',
+		'ts',
     );
 
     // require all modules

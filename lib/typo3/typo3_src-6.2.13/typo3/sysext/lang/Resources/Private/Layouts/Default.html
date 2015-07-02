@@ -1,0 +1,51 @@
+<f:be.container
+	enableJumpToUrl="0"
+	enableClickMenu="0"
+	loadPrototype="0"
+	loadScriptaculous="0"
+	loadExtJs="0"
+	loadJQuery="true"
+	includeCssFiles="{
+		0: '{f:uri.resource(path:\'StyleSheet/LangModule.css\')}'
+	}"
+	includeJsFiles="{
+		0: 'contrib/jquery/jquery.dataTables-1.9.4.min.js',
+		1: '{f:uri.resource(path:\'JavaScript/LangModule.js\')}'
+	}"
+	addJsInlineLabels="{
+		0: 'flashmessage.error',
+		1: 'flashmessage.information',
+		2: 'flashmessage.success',
+		3: 'flashmessage.multipleErrors',
+		4: 'flashmessage.updateComplete',
+		5: 'flashmessage.canceled'
+	}"
+	>
+	<div class="typo3-fullDoc">
+
+		<div id="typo3-docheader">
+			<div class="typo3-docheader-functions">
+				<div class="left">
+					<f:be.buttons.csh />
+				</div>
+				<div class="right">
+				</div>
+			</div>
+			<div class="typo3-docheader-buttons">
+				<div class="left">
+					<f:render section="iconButtons" />
+				</div>
+				<div class="right">
+					<f:be.buttons.shortcut />
+				</div>
+			</div>
+		</div>
+
+		<div id="typo3-docbody">
+			<div id="typo3-inner-docbody">
+				<f:render section="content" />
+			</div>
+		</div>
+
+	</div>
+</f:be.container>

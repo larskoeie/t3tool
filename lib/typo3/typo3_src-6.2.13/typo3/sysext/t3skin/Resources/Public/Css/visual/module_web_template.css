@@ -1,0 +1,11 @@
+/* - - - - - - - - - - - - - - - - - - - - -
+Web > Template
+- - - - - - - - - - - - - - - - - - - - - */
+
+.typo3-tstemplate-ceditor-control {
+	cursor: pointer;
+}
+
+dt.typo3-tstemplate-ceditor-label {
+	font-weight: bold;
+}

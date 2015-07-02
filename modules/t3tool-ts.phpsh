@@ -1,0 +1,106 @@
+<?php
+	/**
+	 * t3tool-sqlq.phpsh
+	 *
+	 * Handles the command "t3tool sqlq <sql>".
+	 *
+	 * @package t3tool
+	 * @author Lars Køie
+	 *
+	 */
+
+	/**
+	 * @param $args
+	 */
+	function t3tool_ts_handlecmd($args) {
+		require_once (PATH_script . 'includes/class.t3tool_ts_handler.php');
+
+		$cmd = array_shift($args);
+
+		switch ($cmd) {
+
+
+			case 'diff' :
+
+
+				if (! trim($args[1])) {
+					output_usage('Usage: t3tool ts diff <ts-1> <ts-2>
+');
+				}
+
+				foreach (array($args[0], $args[1]) as $i => $ts) {
+					if ($abs_file[$i] = t3tool_get_absolute_file_path($ts)) {
+
+						$serialized = t3tool_ts_parse_file_to_serialized($abs_file[$i]);
+						$config[$i] = unserialize($serialized);
+
+
+
+					} else {
+						die('file not found : ' . $ts);
+						// could it be a string or something else ?
+
+					}
+				}
+
+				echo "diff --ts a" . $args[0] . " b" . $args[1] . "\n";
+				echo "--- a/ \n";
+				echo "--- b/ \n";
+				echo "@@ \n";
+
+				t3tool_ts_handler::output_formatted_ts_diff($config[0], $config[1]);
+
+				break;
+			#
+
+			#
+
+			case 'parse-to-serialized' :
+
+				$serialized = t3tool_ts_parse_file_to_serialized($args[0]);
+				echo $serialized;
+				break;
+
+			default :
+				return ("  t3tool ts list
+    List all templates.
+  t3tool template show <uid or title>
+    Show single template with all fields.
+
+");
+
+
+		}
+	}
+
+	function t3tool_ts_parse_file_to_serialized ($filename) {
+		$abs_file = t3tool_get_absolute_file_path($filename);
+		$cmd = "ts parse-to-serialized " . escapeshellarg($abs_file);
+		$serialized = t3tool_call_internal_ext_t3tool($cmd);
+		return $serialized;
+	}
+
+	function t3tool_ts_usage_short()
+	{
+		return ("Template commands:
+");
+
+	}
+
+	function t3tool_ts_cmdaliases()
+	{
+		return array(
+		);
+	}
+
+	/**
+	 * @return array
+	 */
+	function t3tool_ts_completion() {
+		return array(
+			'ts' => array(
+				'diff' => 1,
+			),
+		);
+
+	}

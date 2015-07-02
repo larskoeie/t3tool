@@ -1,0 +1,207 @@
+/**
+ * Extension List View
+ **/
+.distribution {
+	border: 1px solid darken($gray-lighter,15%);
+	background-color: $gray-lighter;
+	margin-bottom: 20px;
+	margin-left: 20px;
+	width: 300px;
+	float: left;
+	&:hover {
+		background-color: darken($gray-lighter,3%);
+		.distribution-hover {
+			top: 0px;
+			opacity: 1;
+		}
+		.distribution-more {
+			text-decoration: underline;
+		}
+	}
+  .typo3-dependency-version {
+    position: absolute;
+    right: 2px;
+
+    .label {
+      display: inline;
+      padding: .2em .6em .3em;
+      font-size: 75%;
+      font-weight: bold;
+      line-height: 1;
+      color: #ffffff;
+      text-align: center;
+      white-space: nowrap;
+      vertical-align: baseline;
+      border-radius: .25em;
+    }
+    a.label:hover,
+    a.label:focus {
+      color: #ffffff;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .label:empty {
+      display: none;
+    }
+    .btn .label {
+      position: relative;
+      top: -1px;
+    }
+    .label-default,
+    .label-obsolete,
+    .label-experimental,
+    .label-test,
+    .label-excludeFromUpdates {
+      background-color: #d7d7d7;
+    }
+    .label-default[href]:hover,
+    .label-default[href]:focus {
+      background-color: #bebebe;
+    }
+    .label-primary {
+      background-color: #0078e6;
+    }
+    .label-primary[href]:hover,
+    .label-primary[href]:focus {
+      background-color: #005db3;
+    }
+    .label-success,
+    .label-stable {
+      background-color: #1eb941;
+    }
+    .label-success[href]:hover,
+    .label-success[href]:focus {
+      background-color: #178d32;
+    }
+    .label-info {
+      background-color: #41b4dc;
+    }
+    .label-info[href]:hover,
+    .label-info[href]:focus {
+      background-color: #249cc6;
+    }
+    .label-warning,
+    .label-beta {
+      background-color: #f07814;
+    }
+    .label-warning[href]:hover,
+    .label-warning[href]:focus {
+      background-color: #c4600d;
+    }
+    .label-danger,
+    .label-alpha {
+      background-color: #c83c3c;
+    }
+    .label-danger[href]:hover,
+    .label-danger[href]:focus {
+      background-color: #a32e2e;
+    }
+  }
+}
+.distribution-holder {
+	@include clearfix;
+	top: 0px;
+	bottom: 0px;
+	margin-left: -20px;
+}
+.distribution-image {
+	position: relative;
+	width: 300px;
+	height: 225px;
+	overflow: hidden;
+	img {
+		display: block;
+		height: 100%;
+		width: 100%;
+	}
+}
+.distribution-hover {
+	background-color: $gray-lighter;
+	position: absolute;
+	top: 100%;
+	left: 0px;
+	width: 300px;
+	height: 225px;
+	overflow: hidden;
+	opacity: 0;
+	@include transition(all 0.2s ease-in-out);
+}
+.distribution-hover-inner {
+	padding: 15px;
+}
+.distribution-meta {
+	border-top: 1px solid darken($gray-lighter,10%);
+	padding: 15px;
+	.distribution-title {
+		margin: 0;
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+		font-size: 14px;
+	}
+	.distribution-install {
+		margin-top: 0.5em;
+	}
+	.t3-button {
+		margin: 0;
+		padding-right: 8px;
+	}
+	.distribution-official {
+		border: 1px solid $brand-color;
+		background-color: $brand-color;
+		border-radius: 2px;
+		display: inline-block;
+		padding: 3px 8px;
+		vertical-align: middle;
+		color: #FFFFFF;
+	}
+}
+
+
+/**
+ * Extension Detail View
+ **/
+.distribution-detail-flashmessage {
+	margin-bottom: 2.5em;
+	p {
+		padding-bottom: 0;
+	}
+}
+.distribution-detail {
+	@include clearfix();
+	min-width: 750px;
+}
+.distribution-detail-previewpane {
+	float: left;
+	margin-right: 30px;
+}
+.distribution-detail-preview {
+	display: block;
+	border: 1px solid darken($gray-lighter,15%);
+}
+.distribution-detail-body {
+	overflow: hidden;
+	zoom: 1;
+}
+.distribution-detail-header {
+	h1 {
+		margin-bottom: 0.5em;
+	}
+	p {
+		padding: 0px;
+		max-width: 500px;
+		margin-bottom: 1.25em;
+	}
+	margin-bottom: 2.5em;
+}
+.distribution-detail-summary {
+	margin-top: 2.5em;
+	margin-bottom: 2.5em;
+}
+.distribution-installed {
+	hr {
+		margin: 2.5em 0;
+		border: 0;
+		border-top: 1px solid darken($gray-lighter,15%);
+	}
+}
