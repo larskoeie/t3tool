@@ -5,10 +5,14 @@ _t3tool() {
     COMPREPLY=();
     cur="${COMP_WORDS[COMP_CWORD]}";
     t=$( t3tool _complete "$cur" "$COMP_LINE" );
-    COMPREPLY=( $( compgen -W "$t" -- $cur ) );
+    if [ "$t" == "_path" ]; then
+        COMPREPLY=( $( compgen -o plusdirs -f -- $cur ) );
+    else
+        COMPREPLY=( $( compgen -W "$t" -- $cur ) );
+    fi
     return 0
 }
 
-complete -F _t3tool t3tool
+complete -o filenames -F _t3tool t3tool
 
 

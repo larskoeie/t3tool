@@ -10,7 +10,8 @@
 
     $cmd = strtolower(array_shift($args));
     $key = trim(($args[0]));
-    $local = getOption('l');
+
+    $local = getOption('local', 'l');
 
     $exists = getLocalConf($key) != NULL;
 
@@ -78,6 +79,7 @@
     return array(
       'config' => array(
         'get' => 't3tool_config_completion_config',
+        'set' => 't3tool_config_completion_config',
       ),
     );
 

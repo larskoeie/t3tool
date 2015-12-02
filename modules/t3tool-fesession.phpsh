@@ -15,13 +15,14 @@
 	function t3tool_fesession_handlecmd($args, $level = 0) {
 
 		$cmd = array_shift($args);
-		$q = array_shift($args);
+		$q = $args[0];
+
 
 		switch ($cmd) {
 
 			//
 			//
-			default :
+			case '' :
 			case 'list' :
 
  				$items = t3tool_get_records_by_string('fe_session_data');
@@ -29,8 +30,30 @@
 
 			case 'show' :
 
-				$item = t3tool_get_records_by_string('fe_session_data', $q, array('hash'));
+				$item = t3tool_get_single_record_by_string('fe_session_data', $q . '*', array('hash'));
 				return sendRecordAsTable($item);
+
+			case 'delete' :
+				$item = t3tool_get_single_record_by_string('fe_session_data', $q . '*', array('hash'));
+				output_cmd(sprintf('Removing FE session data record with hash %s', $item['hash']));
+				sql_query('delete from fe_session_data where hash="' . $item['hash'] . '"');
+				output_ok();
+
+				break;
+
+
+			case 'set' :
+				$index = $args[1];
+				$value = $args[2];
+
+				$item = t3tool_get_single_record_by_string('fe_session_data', $q . '*', array('hash'));
+				output_cmd(sprintf('Setting part %s of session data with hash %s to %s', $index, $item['hash'], $value));
+
+				$content = unserialize($item['content']);
+				$content[$index] = $value;
+				$c = serialize($content);
+				sql_query('update fe_session_data set content="' . addslashes($c) . '" where hash="' . $item['hash'] . '"');
+				output_ok();
 
 
 		}
@@ -45,7 +68,28 @@
 		return array(
 			'fesession' => array(
 				'list' => 1,
-				'show' => 1,
+				'show' => 't3tool_fesession_completion_hashes',
+				'delete' => 't3tool_fesession_completion_hashes',
 			)
 		);
+	}
+
+	function t3tool_fesession_completion_hashes() {
+		$out = array();
+		foreach (sql_get_column('select hash from fe_session_data where 1') as $hash) {
+			// 8 chars should be sufficient for most cases
+			$out[] = substr($hash, 0, 8);
+		};
+		return $out;
+	}
+
+	function t3tool_fesession_usage_short () {
+		return "FE session:
+  t3tool fesession list
+  t3tool fesession show <cookie value>
+    Show contents of a FE session. Cookie value can be partial from beginning.
+  t3tool fesession set <cookie value> <index> <value>
+    Will set contents of FE session.
+
+		";
 	}

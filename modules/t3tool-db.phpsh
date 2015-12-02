@@ -12,6 +12,23 @@ function t3tool_db_handlecmd($args) {
 
 	switch ($cmd) {
 
+		case 'diff' :
+
+			$table = $args[0];
+			$uid1 = $args[1];
+			$uid2 = $args[2];
+
+			$record1 = sql_get_row('select * from ' . $table . ' where uid = ' . $uid1);
+			$record2 = sql_get_row('select * from ' . $table . ' where uid = ' . $uid2);
+
+			$added = array_diff($record1, $record2);
+			$removed = array_diff($record2, $record1);
+
+			output_info('Added');
+			print_r($added);
+
+			break;
+
 		case 'login' :
 			echo sprintf('mysql -h%s -u%s -p%s %s',
 				$GLOBALS['TYPO3_CONF_VARS']['DB']['host'],

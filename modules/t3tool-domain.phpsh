@@ -17,11 +17,11 @@
 		$cmd = array_shift($args);
 
 
-		$domains = t3tool_get_records_by_string('sys_domain', '', array(), 'uid, pid, domainName, hidden');
+		$domains = t3tool_get_records_by_string('sys_domain', '', array(), 'uid, pid, domainName, hidden, sorting');
 
 		$domain = trim(strtolower($args[0]));
 		if ($domain) {
-			$domains = t3tool_get_records_by_string('sys_domain', $domain, array('domainName'), 'uid, pid, domainName, hidden');
+			$domains = t3tool_get_records_by_string('sys_domain', $domain, array('domainName'), 'uid, pid, domainName, hidden, sorting');
 		}
 
 		switch ($cmd) {
@@ -378,4 +378,14 @@
 	 */
 	function t3tool_domain_completion_domains_disabled() {
 		return sql_get_column('select domainName from sys_domain where hidden');
+	}
+
+	/**
+	 * @return array
+	 */
+	function t3tool_domain_completion_options () {
+		return array(
+			'dns',
+			'check',
+		);
 	}

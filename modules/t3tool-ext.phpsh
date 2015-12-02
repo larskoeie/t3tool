@@ -201,6 +201,29 @@
 
 				break;
 
+			case 'health-check':
+				// search for double class overridings
+				foreach ($showOnlyExts as $i => $extkey) {
+					$config = $EM_CONF[$extkey];
+
+					$command = "cd " . PATH_site . $config['added by t3tool']['path'] . $extkey . '; ';
+					$command .= 'grep -rni --include=ext_tables.php --include=ext_localconf.php "SYS.*Objects" .';
+					$output = NULL;
+
+					exec($command, $output);
+					if (sizeof($output)) {
+
+						echo "$extkey: \n";
+						
+						foreach ($output as $file) {
+
+							echo "$file \n";
+						}
+					}
+
+				}
+				break;
+
 			//
 			// List of installed extensions
 			//
@@ -676,6 +699,22 @@ nodesep=0.6;
 
 				break;
 
+			case 'foreach' :
+				$command = $args[0];
+				foreach ($showOnlyExts as $ext) {
+
+					$absPath = PATH_site . $EM_CONF[$ext]['added by t3tool']['path'] . $ext . '/';
+					if (!file_exists($absPath . '.git') && getOption('only-git')) {
+						continue;
+					}
+
+					echo COLOR_BOLD . "$ext :\n" . COLOR_RESET;
+					system('cd ' . $absPath . ';' . $command);
+					echo "\n";
+
+
+				}
+				break;
 			default :
 		}
 	}
@@ -732,6 +771,10 @@ nodesep=0.6;
 		return intval(((int)$versionParts[0] . str_pad((int)$versionParts[1], 3, '0', STR_PAD_LEFT)) . str_pad((int)$versionParts[2], 3, '0', STR_PAD_LEFT));
 	}
 
+
+	function t3tool_ext_grep ($path, $string) {
+
+	}
 
 	function t3tool_ext_cmdaliases() {
 		return array(
@@ -825,4 +868,20 @@ Special options for commands dependencies and mentions
 		}
 
 		return $exts;
+	}
+
+	/**
+	 * @return array
+	 */
+	function t3tool_ext_completion_options () {
+		return array(
+			'dot',
+			'exclude',
+			'git',
+			'include',
+			'include-files',
+			'output',
+			'system',
+			'ter'
+		);
 	}

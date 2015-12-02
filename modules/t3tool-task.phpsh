@@ -62,7 +62,7 @@
         if (!trim($query)) {
           return("Usage : t3tool task show <classname or uid>. Case insensitive.\n");
         }
-        $task = t3tool_get_single_record_by_string('tx_scheduler_task', $query, array('classname'));
+        $task = t3tool_get_single_record_by_string('tx_scheduler_task', $query, array('uid'));
         if ($task['serialized_task_object']) {
           $obj = @unserialize($task['serialized_task_object']);
           $arr = get_object_vars($obj);
@@ -82,16 +82,17 @@
         if (!trim($query)) {
           return("Usage : t3tool task enable <classname or uid>. Case insensitive.\n");
         }
-        $task = t3tool_get_single_record_by_string('tx_scheduler_task', $query, array('classname'));
+        $tasks = t3tool_get_records_by_string('tx_scheduler_task', $query, array('uid'));
 
-        if ($task['disable'] == 0) {
-          return($task['classname'] . " already enabled.\n");
-        }
+		foreach ($tasks as $task) {
+			if ($task['disable'] == 0) {
+				output_info($task['uid'] . " already enabled.\n");
+			}
 
-        echo("Enabling task " . $task['classname'] . "... ");
-        sql_query("update tx_scheduler_task set disable=0 where uid= " . $task['uid'] . " limit 1");
-        echo "done.\n";
-
+			output_cmd("Enabling task " . $task['uid']);
+			sql_query("update tx_scheduler_task set disable=0 where uid= " . $task['uid'] . " limit 1");
+			output_ok();
+		}
         break;
 
       //
@@ -101,15 +102,18 @@
         if (!trim($query)) {
           return("Usage : t3tool task disable <classname or uid>. Case insensitive.");
         }
-        $task = t3tool_get_single_record_by_string('tx_scheduler_task', $query, array('classname'));
+        $tasks = t3tool_get_records_by_string('tx_scheduler_task', $query, array('uid'));
 
-        if ($task['disable'] == 1) {
-          return($task['classname'] . " already disabled.\n");
-        }
-        echo("Disabling task " . $task['classname'] . "... ");
+		foreach ($tasks as $task) {
 
-        sql_query("update tx_scheduler_task set disable=1 where uid =  " . $task['uid'] . " limit 1");
-        echo "done.\n";
+			if ($task['disable'] == 1) {
+			  output_info($task['classname'] . " already disabled.\n");
+			}
+			output_cmd("Disabling task " . $task['uid']);
+
+			sql_query("update tx_scheduler_task set disable=1 where uid =  " . $task['uid'] . " limit 1");
+			output_ok();
+		}
 
         break;
 
@@ -134,11 +138,12 @@
         if (!trim($query)) {
           return("Usage : t3tool task delete <classname or uid>. Case insensitive.");
         }
-        $task = t3tool_get_single_record_by_string('tx_scheduler_task', $query, array());
+        $task = t3tool_get_single_record_by_string('tx_scheduler_task', $query, array('uid'));
 
+        output_cmd('Deleting task ' . $task['uid']);
         sql_query("delete from tx_scheduler_task where uid =  " . $task['uid'] . " limit 1");
-        echo $task['uid'] . " deleted.\n";
-        break;
+        output_ok();
+		break;
 
 
     }
@@ -176,8 +181,9 @@
   function t3tool_task_completion () {
     return array(
       'task' => array(
-        'list' => 1,
-        'stop' => 1,
+		  'delete' => 1,
+		  'list' => 1,
+		  'stop' => 1,
       )
 
     );

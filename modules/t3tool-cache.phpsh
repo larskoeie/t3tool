@@ -22,14 +22,12 @@
 		switch ($cmd) {
 			case 'clear' :
 				$cache = $args[0];
-				if (! trim($cache)) {
+				if (!trim($cache)) {
 					output_usage('Usage:
   t3tool cache clear <cache>
 
 ');
 				}
-
-
 
 
 				t3tool_cache_clear_single($cache);
@@ -42,7 +40,7 @@
 				$cache = $args[0];
 				$q = $args[1];
 
-				if (! trim($q)) {
+				if (!trim($q)) {
 					output_usage('Usage:
 					t3tool cache search <cache> <string>
 					');
@@ -105,7 +103,7 @@
 	 * @param $cache
 	 * @param $q
 	 */
-	function t3tool_cache_search_single ($cache, $q) {
+	function t3tool_cache_search_single($cache, $q) {
 		$file_caches = t3tool_cache_get_file_caches();
 		$db_caches = t3tool_cache_get_db_caches();
 
@@ -116,7 +114,7 @@
 					$matches = t3tool_get_records_by_string($cache, "*$q*", array('tag'));
 				} else {
 					$matches = t3tool_get_records_by_string($cache, "*$q*", array('content'));
-					foreach ($matches as $i=>$dummy) {
+					foreach ($matches as $i => $dummy) {
 						$matches[$i]['expires'] = dateFormat($matches[$i]['expires']);
 
 					}
@@ -149,6 +147,20 @@
 	}
 
 	function t3tool_cache_clear_single($cache) {
+		if ($cache == 'realurl') {
+			$filename = PATH_site . 'typo3conf/realurl_autoconf.php';
+			if (is_file($filename)) {
+
+				output_cmd('Clearing realurl_autoconf.php');
+				unlink($filename);
+				output_ok();
+			} else {
+				output_info('Not existing');
+			}
+
+			return;
+		}
+
 		$file_caches = t3tool_cache_get_file_caches();
 		$db_caches = t3tool_cache_get_db_caches();
 
@@ -247,7 +259,7 @@
 
 	}
 
-	function t3tool_cache_usage_long () {
+	function t3tool_cache_usage_long() {
 		return ("Cache commands:
   t3tool cache clear content
     Truncates all cache tables.
@@ -311,6 +323,7 @@
 				'ext_tables',
 			),
 
+
 			// single caches :
 			'ext_localconf' => 'Cache/Code/cache_core/ext_localconf_*',
 			'ext_tables' => 'Cache/Code/cache_core/ext_tables_*',
@@ -323,6 +336,7 @@
 			'packagemanager' => 'Cache/Code/cache_core/PackageManager_*',
 			'packageobjects' => 'Cache/Code/cache_core/PackageObjects_*',
 			'pics' => 'pics/',
+
 		);
 
 	}
@@ -332,7 +346,16 @@
 	 */
 	function t3tool_cache_get_db_caches() {
 		$out['db'] = '';
-		$out['realurl'] = '';
+		$out['realurl'] = array(
+			'tx_realurl_chashcache',
+			'tx_realurl_errorlog',
+			'tx_realurl_pathcache',
+			'tx_realurl_redirects',
+			'tx_realurl_uniqalias',
+			'tx_realurl_urldecodecache',
+			'tx_realurl_urlencodecache',
+		);
+
 
 		$tables = sql_get_rows('show tables');
 		foreach ($tables as $table) {
@@ -407,7 +430,7 @@
 		return $out;
 	}
 
-	function t3tool_cache_cmdaliases () {
+	function t3tool_cache_cmdaliases() {
 		return array(
 			'cc' => 'cache clear',
 		);
@@ -429,7 +452,7 @@
 				$count += rmdir_recursive("$dir/$file");
 			} else {
 				unlink("$dir/$file");
-				$count ++;
+				$count++;
 			}
 		}
 		rmdir($dir);

@@ -26,13 +26,21 @@
     define('PATH_t3lib', PATH_site . 't3lib/');
 
 	define('INDENT', "\t");
+
+	define('COLOR_BOLD', "\x1b[1;1m");
 	define('COLOR_RED', "\x1b[1;31m");
 	define('COLOR_BLUE', "\x1b[1;34m");
-	define('COLOR_ADDITION', COLOR_BLUE);
-	define('COLOR_DELETION', COLOR_RED);
+	define('COLOR_PURPLE', "\x1b[1;35m");
+	define('COLOR_GREEN', "\x1b[1;32m");
+	define('COLOR_YELLOW', "\x1b[1;33m");
 
+	define('COLOR_ADDITION', COLOR_GREEN);
+	define('COLOR_DELETION', COLOR_RED);
 	define('COLOR_RESET', "\x1b[0m");
-	// @TODO : more color constants here
+
+	define('PREFIX_ADDITION', COLOR_ADDITION . '+ ');
+	define('PREFIX_DELETION', COLOR_DELETION . '- ');
+	define('PREFIX_NOTCHANGED', COLOR_RESET . '  ');
 
 	error_reporting(E_ALL ^ E_NOTICE ^ E_DEPRECATED);
     //  error_reporting(E_ALL);
@@ -94,7 +102,7 @@
         }
     }
 
-    // global aliases
+	// global aliases
     $filename = PATH_script . 'includes/aliases.php';
     if (file_exists($filename)) {
         $GLOBALS['aliases'] = array_merge($GLOBALS['aliases'], include($filename));
@@ -107,8 +115,19 @@
         include($filename);
     }
 
+	// build options
+	// options defined by modules
+	$GLOBALS['options'] = array();
+	foreach ($GLOBALS['modules'] as $m) {
+		$function = 't3tool_' . $m . '_completion_options';
+		if (function_exists($function)) {
+			$GLOBALS['options'] = array_merge($GLOBALS['options'], $function());
+		}
+	}
 
-    readData();
+
+
+	readData();
 
 
     $GLOBALS['version_4'] = is_file(PATH_typo3conf . 'localconf.php');

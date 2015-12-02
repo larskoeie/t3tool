@@ -171,6 +171,30 @@ Options:
 	}
 
 	/**
+	 * Read TYPO3 configuration without local part and return it.
+	 */
+	function t3tool_read_conf_wo_local_part() {
+		global $TYPO3_CONF_VARS;
+
+		if ($GLOBALS['version_4']) {
+			require_once(PATH_typo3conf . 'localconf.php');
+			$GLOBALS['TYPO3_CONF_VARS']['DB'] = array(
+				'host' => $typo_db_host,
+				'username' => $typo_db_username,
+				'password' => $typo_db_password,
+				'database' => $typo_db,
+			);
+			$config = $GLOBALS['TYPO3_CONF_VARS'];
+		}
+		if ($GLOBALS['version_6']) {
+			$config = include(PATH_typo3conf . 'LocalConfiguration.php');
+		}
+
+		return $config;
+
+	}
+
+	/**
 	 * Connect to database. We use lazy database initialization for performance.
 	 *
 	 * @return bool Success
@@ -500,7 +524,7 @@ Options:
 	/*
 	 * If field matches, replace it with the cropped and hilited version
 	 */
-	function t3tool_crop_and_hilite_record ($record, $q) {
+	function t3tool_crop_and_hilite_record($record, $q) {
 		$q_preg = str_replace(array('*', '?'), array('.*', '.'), $q);
 		foreach ($record as $field => $value) {
 			if (preg_match('/' . $q_preg . '/', $value)) {
@@ -537,7 +561,7 @@ Options:
 	 * @param string $alias
 	 * @return string
 	 */
-	function getDefaultWhereClause ($table, $alias = '') {
+	function getDefaultWhereClause($table, $alias = '') {
 		return
 			getPidClause($table, $alias) .
 			getDeleteClause($table, $alias);
@@ -548,7 +572,7 @@ Options:
 	 * @param $alias
 	 * @return string
 	 */
-	function getPidClause ($table, $alias = '') {
+	function getPidClause($table, $alias = '') {
 		if ($alias == '') {
 			$alias = $table;
 		}
@@ -560,6 +584,7 @@ Options:
 
 		return '';
 	}
+
 	/**
 	 * Returns a delete clause for the table. Very similar to t3lib_befunc::enableFields().
 	 *
@@ -647,32 +672,38 @@ Options:
 
 
 		if ($q) {
-			$q = str_replace(array('*', '?'), array('%', '_'), $q);
-			// handle negation
-			if (strpos($q, '!') !== FALSE) {
-				if (preg_match(';^\!\((.*)\)$;', $q, $m)) {
-					$q = $m[1];
-
-					$and = " $table.uid!='$q'";
-					foreach ($fields as $field) {
-						$and .= " and $table.$field not like '$q'";
-					}
-					$where = "and ($and)" . getDeleteClause($table);
-
-				} else {
-					// "!" used in a way that is not allowed
-					output_fail('"!" is allowed only as first character and only followed by parenthesises that surround the entire string.');
-					return array();
-				}
+			if (! preg_match('/[^0-9,]/', $q)) {
+				// q is (comma separated list of) uid(s)
+				$where = 'AND uid IN (' . $q . ')' . getDeleteClause($table);
 			} else {
-				$or = '0';
-				if (is_array($GLOBALS['TCA'][$table])) {
-					$or .= " or $table.uid='$q'";
+				// q is not numeric
+				$q = str_replace(array('*', '?'), array('%', '_'), $q);
+				// handle negation
+				if (strpos($q, '!') !== FALSE) {
+					if (preg_match(';^\!\((.*)\)$;', $q, $m)) {
+						$q = $m[1];
 
-				}
+						$and = " $table.uid!='$q'";
+						foreach ($fields as $field) {
+							$and .= " and $table.$field not like '$q'";
+						}
+						$where = "and ($and)" . getDeleteClause($table);
 
-				foreach ($fields as $field) {
-					$or .= " or lower(convert($table.$field using utf8)) like '$q'";
+					} else {
+						// "!" used in a way that is not allowed
+						output_fail('"!" is allowed only as first character and only followed by parenthesises that surround the entire string.');
+						return array();
+					}
+				} else {
+					$or = '0';
+					if (is_array($GLOBALS['TCA'][$table])) {
+						$or .= " or $table.uid='$q'";
+
+					}
+
+					foreach ($fields as $field) {
+						$or .= " or lower(convert($table.$field using utf8)) like '$q'";
+					}
 				}
 				$where = "and ($or)" . getDeleteClause($table);
 
@@ -758,8 +789,10 @@ Options:
 			$b[0] = str_pad('', $l[0], '-');
 		}
 		foreach ($values as $k => $v) {
-			if (preg_match('/^A|O:[0-9]+:/', $values[$k])) {
+			if (preg_match('/^A|O:[0-9]+:/i', $values[$k])) {
+				// add to prependObjects to show them after table
 				$values[$k] = unserialize($values[$k]);
+				$prependObjects[$keys[$k]] = $values[$k];
 			}
 			if (is_object($values[$k])) {
 				$values[$k] = print_r($values[$k], 1);
@@ -786,6 +819,14 @@ Options:
 			$out .= $values[$k] . " |\n";
 		}
 		$out .= "+-" . implode('-+-', $b) . "-+\n";
+
+		// need not be objects, could be arrays
+		if (is_array($prependObjects)) {
+			foreach ($prependObjects as $label => $o) {
+				$out .= COLOR_BOLD . "$label :\n" . COLOR_RESET . print_r($o, TRUE);
+			}
+		}
+
 		return $out;
 
 	}
@@ -810,7 +851,7 @@ Options:
 	 * @param array $haystack
 	 * @return bool
 	 */
-	function in_array_wildcard ($needle, array $haystack) {
+	function in_array_wildcard($needle, array $haystack) {
 		foreach ($haystack as $item) {
 			if (preg_match(';^' . str_replace('*', '.*', $item) . '$;', $needle)) {
 				return TRUE;
@@ -825,7 +866,7 @@ Options:
 	 * @param $s
 	 */
 	function objectToString($s, $index = NULL) {
-		if (preg_match('/^A|O:[0-9]+:/i', $s)) {
+		if (is_string($s) && preg_match('/^A|O:[0-9]+:/i', $s)) {
 			$s = unserialize($s);
 		}
 		if (gettype($s) == 'object') {
@@ -855,7 +896,7 @@ Options:
 	 * @param $unix
 	 * @return string
 	 */
-	function dateFormat ($unix) {
+	function dateFormat($unix) {
 		switch (getOption('date')) {
 			case 'age' :
 			case 'relative' :
@@ -875,7 +916,7 @@ Options:
 	 * @param $seconds
 	 * @return string
 	 */
-	function dateFormatInterval ($seconds) {
+	function dateFormatInterval($seconds) {
 		if ($seconds > 3600) {
 			return floor($seconds / 3600) . ' hrs.';
 		}
@@ -897,7 +938,7 @@ Options:
 
 		if (getOption('raw')) {
 			// output first column of each row
-			foreach ($a as $y=>$row) {
+			foreach ($a as $y => $row) {
 				$lines[] = array_values($row)[0];
 			}
 			return implode("\n", $lines) . "\n";
@@ -940,7 +981,7 @@ Options:
 
 				foreach ($a as $y => $row) {
 					foreach ($row as $x => $d) {
-						$a[$y][$x] = objectToString($a[$y][$x]);
+						$a[$y][$x] = objectToString($a[$y][$x], $x);
 					}
 				}
 				foreach ($a as $y => $row) {
@@ -1140,15 +1181,25 @@ Options:
 	 * @param null $local
 	 */
 	function setLocalConf($path, $value, $local = NULL) {
+		if ($local === NULL) {
+			$local = getOption('local');
+		}
 		$path = explode('.', $path);
 
-		$data = &$GLOBALS['TYPO3_CONF_VARS'];
+		if ($local) {
+			$data = &$GLOBALS['TYPO3_CONF_VARS'];
+		} else {
+			$config_wo_local = t3tool_read_conf_wo_local_part();
+			$data = &$config_wo_local;
+		}
+
 		$exists = TRUE;
 		foreach ($path as $index) {
-			if (!isset($data[$index])) {
+			if (isset($data[$index])) {
+				$data = &$data[$index];
+			} else {
 				$exists = FALSE;
 			}
-			$data = &$data[$index];
 		}
 		$olddata = $data;
 		$data = $value;
@@ -1158,8 +1209,9 @@ Options:
 		if ($GLOBALS['version_4'] || $local) {
 			appendToPHPFile($filename, "\$GLOBALS['TYPO3_CONF_VARS']['" . implode("']['", $path) . "'] = " . var_export($value, 1) . ";\n");
 		} else {
-			// TODO : this will write entire array, including stuff from local, which it should not.....
-			file_put_contents($filename, '<?php return ' . var_export($GLOBALS['TYPO3_CONF_VARS'], 1) . ';');
+			// read config from LocalConfiguration only
+			$fileContent = '<?php return ' . preg_replace("/\n +array \(/", 'array (', var_export($config_wo_local, 1)) . ';';
+			file_put_contents($filename, $fileContent);
 		}
 		echo "ok.\n";
 
@@ -1169,16 +1221,15 @@ Options:
 	 * Get filename of current configuration file. Relative to PATH_site.
 	 *
 	 * @param $local
-	 * @return string
+	 * @return string Absolute path to file
 	 */
 	function getConfFilename($local) {
-		$filename = 'typo3conf/';
+		$filename = PATH_site . 'typo3conf/';
 		if ($GLOBALS['version_4']) {
 			$filename .= $local ? 'localconf_local.php' : 'localconf.php';
 		} else {
 			$filename .= $local ? 'AdditionalConfiguration.php' : 'LocalConfiguration.php';
 		}
-
 		return $filename;
 	}
 
@@ -1354,7 +1405,7 @@ Options:
 	function output_sendinfo($level) {
 		if (is_array($GLOBALS['info'])) {
 			foreach ($GLOBALS['info'] as $info) {
-				t3tool_output ('        ' . str_repeat('  ', $level) . $info . "\n");
+				t3tool_output('        ' . str_repeat('  ', $level) . $info . "\n");
 			}
 		}
 		$GLOBALS['info'] = array();
@@ -1413,7 +1464,7 @@ Options:
 		output_sendinfo($level + 1);
 	}
 
-	function t3tool_output ($s) {
+	function t3tool_output($s) {
 		if (getOption('quiet')) {
 			return;
 		}
@@ -1425,9 +1476,9 @@ Options:
 	/**
 	 * @param $s
 	 */
-	function t3tool_debug ($s) {
+	function t3tool_debug($s) {
 		if (getOption('debug')) {
-			print_r( $s);
+			print_r($s);
 		}
 
 	}
@@ -1448,6 +1499,22 @@ Options:
 		return array('FIRSTROOT');
 	}
 
+	/**
+	 * @return array
+	 */
+	function t3tool_core_completion_options() {
+		return array(
+			'debug',
+			'deleted',
+			'depth',
+			'format',
+			'full',
+			'only-deleted',
+			'pid',
+			'quiet',
+			'raw',
+		);
+	}
 
 	/**
 	 * @param $current
@@ -1455,15 +1522,24 @@ Options:
 	 *
 	 * @return string
 	 *
-	 * TODO: Does not work when command contains options ("-p" , "--recursive")
+	 * TODO: Does not autocomplete options ("-p" , "--recursive"), but neither stops when it meets one. There is not at pt. any centralized register of options.
 	 */
 	function getTabCompleteString($current, $comp_line) {
 		$args = explode(' ', trim($comp_line));
 		array_shift($args);
 
+		// remove options (parts that start with a hyphen)
+		foreach ($args as $i => $arg) {
+			if ($arg{0} == '-') {
+				unset($args[$i]);
+			}
+		}
+		$args = array_values($args);
+
 		if ($current == $args[sizeof($args) - 1]) {
 			array_pop($args);
 		}
+		// dig in to command array
 		$t = $GLOBALS['commands'];
 		foreach ($args as $n => $arg) {
 			if (!isset($t[$arg])) {
@@ -1472,7 +1548,9 @@ Options:
 			if (is_string($t[$arg])) {
 				$funcs = explode(',', $t[$arg]);
 				$func = trim($funcs[sizeof($args) - $n - 1]);
-				if (function_exists($func)) {
+				if ($func == '_path') {
+					return '_path';
+				} elseif (function_exists($func)) {
 					return implode(' ', call_user_func($func, $current, $comp_line));
 				}
 			}
@@ -1520,7 +1598,6 @@ Options:
 	}
 
 
-
 	/**
 	 * Calls the internal extension t3tool
 	 *
@@ -1533,12 +1610,12 @@ Options:
 	}
 
 	/**
-	 * Looks in current working dir (which might not be getcwd() at this point, and in site root.
+	 * Looks in current working dir (which might not be getcwd() at this point), and in site root.
 	 *
 	 * @param $file
 	 * @return string
 	 */
-	function t3tool_get_absolute_file_path ($file) {
+	function t3tool_get_absolute_path($file) {
 
 		if (file_exists($file)) {
 			return $file;

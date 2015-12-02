@@ -21,13 +21,10 @@
       // List
       //
       case 'list' :
-        $items = t3tool_get_records_by_string('tx_devlog', $q, array('msg'), 'uid, crdate, msg, data_var', 'crdate desc', 50);
+        $items = t3tool_get_records_by_string('tx_devlog', $q, array('msg'), 'uid, crdate, severity, msg, data_var', 'crdate desc', 50);
 
         if (!$items) {
           return ("No matching items.\n");
-        }
-        foreach ($items as $i=>$item) {
-          $items[$i]['crdate'] = strftime('%d.%m.%Y %H.%M', $items[$i]['crdate']);
         }
 
         return sendAsFlatTable($items);

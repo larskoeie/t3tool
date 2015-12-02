@@ -13,7 +13,13 @@
 	 * @param $args
 	 */
 	function t3tool_ts_handlecmd($args) {
-		require_once (PATH_script . 'includes/class.t3tool_ts_handler.php');
+
+		if (file_exists(PATH_script . 'includes/class.t3tool_ts_handler.php')) {
+			require_once (PATH_script . 'includes/class.t3tool_ts_handler.php');
+		}
+		if (file_exists('/usr/local/bin/tools/t3tool/includes/class.t3tool_ts_handler.php')) {
+			require_once (PATH_script . 'includes/class.t3tool_ts_handler.php');
+		}
 
 		$cmd = array_shift($args);
 
@@ -22,19 +28,15 @@
 
 			case 'diff' :
 
-
 				if (! trim($args[1])) {
 					output_usage('Usage: t3tool ts diff <ts-1> <ts-2>
 ');
 				}
 
 				foreach (array($args[0], $args[1]) as $i => $ts) {
-					if ($abs_file[$i] = t3tool_get_absolute_file_path($ts)) {
-
+					if ($abs_file[$i] = t3tool_get_absolute_path($ts)) {
 						$serialized = t3tool_ts_parse_file_to_serialized($abs_file[$i]);
 						$config[$i] = unserialize($serialized);
-
-
 
 					} else {
 						die('file not found : ' . $ts);
@@ -43,11 +45,6 @@
 					}
 				}
 
-				echo "diff --ts a" . $args[0] . " b" . $args[1] . "\n";
-				echo "--- a/ \n";
-				echo "--- b/ \n";
-				echo "@@ \n";
-
 				t3tool_ts_handler::output_formatted_ts_diff($config[0], $config[1]);
 
 				break;
@@ -55,6 +52,16 @@
 
 			#
 
+			/*
+			 * Parse
+			 */
+			case 'parse' :
+
+				break;
+
+			/**
+			 *
+			 */
 			case 'parse-to-serialized' :
 
 				$serialized = t3tool_ts_parse_file_to_serialized($args[0]);
@@ -73,10 +80,17 @@
 		}
 	}
 
+	/**
+	 * Filename can be a directory.
+	 *
+	 * @param $filename
+	 * @return string
+	 */
 	function t3tool_ts_parse_file_to_serialized ($filename) {
-		$abs_file = t3tool_get_absolute_file_path($filename);
+		$abs_file = t3tool_get_absolute_path($filename);
 		$cmd = "ts parse-to-serialized " . escapeshellarg($abs_file);
-		$serialized = t3tool_call_internal_ext_t3tool($cmd);
+		$encoded = t3tool_call_internal_ext_t3tool($cmd);
+		$serialized = base64_decode($encoded);
 		return $serialized;
 	}
 
@@ -99,7 +113,7 @@
 	function t3tool_ts_completion() {
 		return array(
 			'ts' => array(
-				'diff' => 1,
+				'diff' => '_path,_path',
 			),
 		);
 

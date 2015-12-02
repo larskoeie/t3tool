@@ -187,7 +187,7 @@ function t3tool_user_handlecmd($args) {
         //
         case 'members' :
             $group = t3tool_get_single_record_by_string('be_groups', $args[0], array('title'));
-            $users = sql_get_rows('select uid, disable, username, email
+            $users = sql_get_rows('select uid, disable, username, realName, email
       from be_users
       where find_in_set(' . $group['uid'] . ', usergroup)');
 
@@ -314,10 +314,12 @@ function t3tool_user_handlecmd($args) {
                 'email'
             ));
             if (trim($user['uc'])) {
-                $user['uc'] = unserialize($user['uc']);
+                $uc = unserialize($user['uc']);
             }
+			unset($user['uc']);
 
-            return sendRecordAsTable($user);
+            return sendRecordAsTable($user) .
+			print_r($uc, TRUE);
             break;
 
         //
