@@ -29,7 +29,6 @@
 ');
 				}
 
-
 				t3tool_cache_clear_single($cache);
 				break;
 
@@ -49,9 +48,11 @@
 				}
 
 				return t3tool_cache_search_single($cache, $q);
-
 				break;
 
+			/**
+			 * Build stats table of all caches with number of entries in each.
+			 */
 			case 'stat' :
 
 				foreach (t3tool_cache_get_db_caches() as $cache => $table) {
@@ -134,6 +135,8 @@
 
 
 	/**
+	 * Truncate a cache table.
+	 *
 	 * @param $table
 	 */
 	function t3tool_cache_truncate_table($table) {
@@ -146,11 +149,17 @@
 
 	}
 
+	/**
+	 * Clear a single cache. OR if passed cache parameter is not a single cache, but an alias for multiple caches,
+	 * clear them all.
+	 *
+	 * @param $cache
+	 * @return bool|void
+	 */
 	function t3tool_cache_clear_single($cache) {
 		if ($cache == 'realurl') {
 			$filename = PATH_site . 'typo3conf/realurl_autoconf.php';
 			if (is_file($filename)) {
-
 				output_cmd('Clearing realurl_autoconf.php');
 				unlink($filename);
 				output_ok();
@@ -158,7 +167,7 @@
 				output_info('Not existing');
 			}
 
-			return;
+			return TRUE;
 		}
 
 		$file_caches = t3tool_cache_get_file_caches();
@@ -167,7 +176,7 @@
 		if ($cache == 'all') {
 			t3tool_cache_clear_single('db');
 			t3tool_cache_clear_single('file');
-			return;
+			return TRUE;
 		}
 
 		if (isset($file_caches[$cache])) {
@@ -228,7 +237,7 @@
 	}
 
 	/**
-	 *
+	 * Remove cached PHP code
 	 */
 	function t3tool_cache_code() {
 		output_cmd("Clearing cached code");
@@ -264,7 +273,7 @@
   t3tool cache clear content
     Truncates all cache tables.
   t3tool cache clear code
-    Deletes all cached code from extensions.
+    Deletes all cached code.
   t3tool cache clear db
     Truncate all cache tables in DB. More specifically, truncate all tables whose name either
       - starts with 'cf_', or
@@ -278,6 +287,8 @@
 	}
 
 	/**
+	 * Hook _completion
+	 *
 	 * @return array
 	 */
 	function t3tool_cache_completion() {
@@ -289,11 +300,18 @@
 				'search' => 't3tool_cache_completion_caches',
 				'stat' => 1,
 			),
+			'cc' => 't3tool_cache_completion_caches',
 
 		);
 
 	}
 
+	/**
+	 * Return array of file caches
+	 *
+	 * @return array
+	 *
+	 */
 	function t3tool_cache_get_file_caches() {
 		return array(
 			// multiple caches :

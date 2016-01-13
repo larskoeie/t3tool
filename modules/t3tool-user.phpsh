@@ -559,6 +559,7 @@ function t3tool_user_completion() {
             'groups' => 't3tool_user_completion_users',
             'list' => 1,
             'members' => 't3tool_user_completion_groups',
+            'online' => 1,
             'password' => 't3tool_user_completion_users',
             'removeemail' => 't3tool_user_completion_users',
             'rmgroup' => 't3tool_user_completion_users, t3tool_user_completion_groups',

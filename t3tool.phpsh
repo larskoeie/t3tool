@@ -12,13 +12,11 @@
     /**
      *
      * Should be called from t3tool
-     * path should be TYPO3 root dir (PATH_site)
      *
      */
 
     // initialize
     require_once('init.php');
-
 
     // remove arg-0 which is path to script
     array_shift($argv);
@@ -99,6 +97,11 @@
     t3tool_debug(array('args' => $args, 'options' => $GLOBALS['options']));
 
     // handle command
-    echo t3tool_handlecmd($args);
+    $output = t3tool_handlecmd($args);
+
+    // send output if not quiet
+    if (! getOption('q', 'quiet')) {
+        echo $output;
+    }
 
 

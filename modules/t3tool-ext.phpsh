@@ -214,7 +214,7 @@
 					if (sizeof($output)) {
 
 						echo "$extkey: \n";
-						
+
 						foreach ($output as $file) {
 
 							echo "$file \n";
@@ -291,6 +291,7 @@
 				break;
 
 			case 'mentions' :
+
 				$extkeys = array();
 
 				$from = trim(strtolower($args[0]));

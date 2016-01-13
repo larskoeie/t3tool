@@ -3,7 +3,7 @@
 	// store original PWD before altering it
 	define('PATH_cwd', getcwd() . '/');
 
-    // find the root
+    // find the root of the TYPO3 site
     while (!is_dir('typo3conf') && !is_file('.t3tool-root') && getcwd() != '/') {
         chdir('..');
     }
@@ -18,15 +18,17 @@
         }
     }
 
-    # init
+    // set some TYPO3 constants
     define('TYPO3_MODE', 'BE');
     define('PATH_script', dirname(__FILE__) . '/');
     define('PATH_site', getcwd() . '/');
     define('PATH_typo3conf', PATH_site . 'typo3conf/');
     define('PATH_t3lib', PATH_site . 't3lib/');
 
+	// set indentation string
 	define('INDENT', "\t");
 
+	// define some colors
 	define('COLOR_BOLD', "\x1b[1;1m");
 	define('COLOR_RED', "\x1b[1;31m");
 	define('COLOR_BLUE', "\x1b[1;34m");
@@ -34,9 +36,12 @@
 	define('COLOR_GREEN', "\x1b[1;32m");
 	define('COLOR_YELLOW', "\x1b[1;33m");
 
+	define('COLOR_BG_YELLOW', "\x1b[1;43m");
+
 	define('COLOR_ADDITION', COLOR_GREEN);
 	define('COLOR_DELETION', COLOR_RED);
-	define('COLOR_RESET', "\x1b[0m");
+	define('COLOR_HILITE', COLOR_BG_YELLOW);
+	define('COLOR_RESET', "\x1b[0m\e[1;49m");
 
 	define('PREFIX_ADDITION', COLOR_ADDITION . '+ ');
 	define('PREFIX_DELETION', COLOR_DELETION . '- ');
@@ -49,7 +54,7 @@
 
     require_once(PATH_script . 'includes/functions.php');
 
-    # list of activated modules
+    // list of activated modules
     $GLOBALS['modules'] = array(
         'cache',
         'config',
@@ -91,7 +96,6 @@
         }
     }
 
-
     // build aliases
     // aliases defined by modules
     $GLOBALS['aliases'] = array();
@@ -125,14 +129,14 @@
 		}
 	}
 
-
-
+	// read t3tool persistent data
 	readData();
 
-
+	// set either v4 or v6
     $GLOBALS['version_4'] = is_file(PATH_typo3conf . 'localconf.php');
     $GLOBALS['version_6'] = is_file(PATH_typo3conf . 'LocalConfiguration.php');
 
+	// read TYPO3 global configuration
     t3tool_read_conf();
 
     // if called from bash_completion, leave early
@@ -140,8 +144,8 @@
         die(getTabCompleteString($argv[2], $argv[3]));
     }
 
+	// build the TCA
     t3tool_build_tca();
-
 
     // part of TCA
     $label = array(

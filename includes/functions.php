@@ -22,7 +22,6 @@
 		// check if an alias matches
 		foreach ($args as $i => $value) {
 			$alias_key = implode(' ', array_slice($args, 0, $i));
-
 			if (isset($GLOBALS['aliases'][$alias_key])) {
 				$alias_args = array_slice($args, $i);
 				if (is_array($GLOBALS['aliases'][$alias_key])) {
@@ -34,7 +33,6 @@
 						$child_args = explode(' ', $str);
 						return t3tool_handlecmd($child_args, $level + 1);
 					}
-
 				} else {
 					$args = explode(' ', str_replace($alias_key, $GLOBALS['aliases'][$alias_key], implode(' ', $args)));
 					return t3tool_handlecmd($args, $level + 1);
@@ -43,7 +41,6 @@
 		}
 
 		$module = array_shift($args);
-
 
 		// handle help function
 		if ($module == 'help') {
@@ -98,10 +95,7 @@ Options:
 			}
 
 			return $out;
-
-
 		}
-
 
 		// dispatch command and arguments to module
 		if (in_array($module, $GLOBALS['modules'])) {
@@ -109,7 +103,6 @@ Options:
 			if (function_exists($function)) {
 				return $function($args, $level + 1);
 			}
-
 		} else {
 			echo "Missing command. See 't3tool help' for more info\n";
 		}
@@ -120,9 +113,7 @@ Options:
 			}
 			$GLOBALS['info'] = array();
 		}
-
 	}
-
 
 	/**
 	 * Build the TCA and store it in global var.
@@ -232,7 +223,9 @@ Options:
 		$GLOBALS['DBIsInited'] = TRUE;
 
 		// remove tables from TCA that don't exist in database
+		// this is to avoid DB errors later
 		$temp = sql_get_rows('show tables');
+		$db_tables = array();
 		foreach ($temp as $temp2) {
 			list(, $table) = each($temp2);
 			$db_tables[$table] = TRUE;
@@ -240,7 +233,6 @@ Options:
 		if (is_array($GLOBALS['TCA'])) {
 			$GLOBALS['TCA'] = array_intersect_key($GLOBALS['TCA'], $db_tables);
 		}
-
 		return TRUE;
 	}
 
@@ -270,7 +262,6 @@ Options:
 					print $bt['function'] . ', ' . $bt['file'] . ', line ' . $bt['line'] . "\n";
 				}
 			}
-
 			return FALSE;
 		}
 		return $res;
@@ -362,6 +353,7 @@ Options:
 	 */
 	function sql_get_column($sql) {
 		$rows = sql_get_rows($sql);
+		$column = array();
 		if ($rows) {
 			foreach ($rows as $row) {
 				$temp = each($row);
@@ -376,12 +368,13 @@ Options:
 	 * Puts all rows in the correct place in the page tree and output the result.
 	 *
 	 * @param array $rows
+	 * @return string
 	 */
 	function showRecordsInPageTree(array $rows, $table = '') {
 		global $label;
 
 		if (!is_array($rows)) {
-			return;
+			return '';
 		}
 
 		$result = array();
@@ -424,14 +417,16 @@ Options:
 	/**
 	 * Return an array of pids under a pid
 	 *
-	 * @param int $pid
+	 * @param string|array $pids
 	 * @param int $depth
 	 *
 	 * @return array
 	 */
-	function getPidList($pid, $depth = 100) {
-		$pages = sql_get_rows('select uid from pages where pid=' . intval($pid) . getDeleteClause('pages'));
-		$pids = array($pid);
+	function getPidList($pids, $depth = 100) {
+		if (! is_array($pids)) {
+			$pids = explode(',', $pids);
+		}
+		$pages = sql_get_rows('select uid from pages where pid in (' . implode(',', $pids) . getDeleteClause('pages'));
 		foreach ($pages as $page) {
 			$pids = array_merge($pids, getPidList($page['uid']));
 		}
@@ -513,7 +508,7 @@ Options:
 		if ($a > 0) {
 			$out .= '... ';
 		}
-		$out .= $before . "\x1b[43m" . $match . "\x1b[49m" . $after;
+		$out .= $before . COLOR_HILITE . $match . COLOR_RESET . $after;
 		if ($a + strlen($q) + $before_len + $after_len < strlen($s)) {
 			$out .= ' ...';
 		}
@@ -578,7 +573,7 @@ Options:
 		}
 
 		$pid = getOption('pid');
-		if ($pid !== NULL) {
+		if ($pid) {
 			return " AND $alias.pid in (" . implode(',', getPidList($pid, getOption('depth'))) . ')';
 		}
 
@@ -593,13 +588,20 @@ Options:
 	 * @param $alias
 	 */
 	function getDeleteClause($table, $alias = '') {
+		// handle options that override this functionality
 		if (getOption('deleted')) {
 			return '';
 		}
+		if (getOption('deleted-pages') && $table == 'pages') {
+			return '';
+		}
+		if (getOption('deleted-elements') && $table != 'pages') {
+			return '';
+		}
+
 		if ($alias == '') {
 			$alias = $table;
 		}
-
 
 		// these tables have field deleted
 		if (in_array($table, array(

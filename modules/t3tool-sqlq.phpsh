@@ -20,13 +20,16 @@ function t3tool_sqlq_handlecmd($args) {
     return("t3tool sqlq <sql query>\n    Will run an sql query on TYPO3 database and output the result if any.\n");
   }
 
+	output_cmd('Running SQL query "' . crop($sql, 100) . '"');
   $result = sql_get_rows($sql);
+	output_ok();
+
   if ($result == FALSE) {
-    return("No rows.\n");
+   output_info("No rows.\n");
   }
   if ($result === TRUE) {
     $updated = sql_affected_rows();
-    return('OK - ' . $updated . " affected rows.\n");
+    output_info('OK - ' . $updated . " affected rows.\n");
   }
 
   return sendAsFlatTable($result);
