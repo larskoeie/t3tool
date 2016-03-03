@@ -41,7 +41,7 @@
 	define('COLOR_ADDITION', COLOR_GREEN);
 	define('COLOR_DELETION', COLOR_RED);
 	define('COLOR_HILITE', COLOR_BG_YELLOW);
-	define('COLOR_RESET', "\x1b[0m\e[1;49m");
+	define('COLOR_RESET', "\x1b[0m");
 
 	define('PREFIX_ADDITION', COLOR_ADDITION . '+ ');
 	define('PREFIX_DELETION', COLOR_DELETION . '- ');

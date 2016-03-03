@@ -56,6 +56,8 @@
 			 * Parse
 			 */
 			case 'parse' :
+				$serialized = t3tool_ts_parse_file_to_serialized($args[0]);
+				return print_r(unserialize($serialized), TRUE);
 
 				break;
 
@@ -67,6 +69,28 @@
 				$serialized = t3tool_ts_parse_file_to_serialized($args[0]);
 				echo $serialized;
 				break;
+
+			/**
+			 *
+			 */
+			case 'parse-to-yaml' :
+				$serialized = t3tool_ts_parse_file_to_serialized($args[0]);
+				return yaml_emit(unserialize($serialized));
+				break;
+
+			/**
+			 *
+			 */
+			case 'parse-to-php' :
+
+				$serialized = t3tool_ts_parse_file_to_serialized($args[0]);
+
+				return '<?php return ' .
+				var_export(unserialize($serialized), TRUE) .
+				";";
+
+				break;
+
 
 			default :
 				return ("  t3tool ts list
@@ -94,15 +118,13 @@
 		return $serialized;
 	}
 
-	function t3tool_ts_usage_short()
-	{
-		return ("Template commands:
+	function t3tool_ts_usage_short() {
+		return ("TypoScript commands:
 ");
 
 	}
 
-	function t3tool_ts_cmdaliases()
-	{
+	function t3tool_ts_cmdaliases() {
 		return array(
 		);
 	}
@@ -114,6 +136,10 @@
 		return array(
 			'ts' => array(
 				'diff' => '_path,_path',
+				'parse' => '_path',
+				'parse-to-serialized' => '_path',
+				'parse-to-yaml' => '_path',
+				'parse-to-php' => '_path',
 			),
 		);
 

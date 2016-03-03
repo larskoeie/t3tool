@@ -203,6 +203,8 @@
 
 			case 'health-check':
 				// search for double class overridings
+				$conflicts = 0;
+
 				foreach ($showOnlyExts as $i => $extkey) {
 					$config = $EM_CONF[$extkey];
 
@@ -213,15 +215,58 @@
 					exec($command, $output);
 					if (sizeof($output)) {
 
-						echo "$extkey: \n";
+						$out .= "\n" .  $extkey . " overrides :\n"  ;
 
-						foreach ($output as $file) {
+						foreach ($output as $occurence) {
+							if (preg_match(';SYS.*Objects.\]\[.([^ \]]+).\];', $occurence, $m)) {
+								$class = trim($m[1], '\[\]\'"');
+								$class = str_replace('\\\\', '\\', $class);
+								if (isset($classes[$class])) {
+									$out .= INDENT . "[CONFLICT] $class\n";
+									$conflicts ++;
+								} else {
+									$out .= INDENT . "$class \n";
+									$classes[$class] = 1;
+								}
 
-							echo "$file \n";
+							}
+
 						}
 					}
 
 				}
+				$out .= "$conflicts conflict(s)\n\n ";
+
+				foreach ($showOnlyExts as $i => $extkey) {
+					$config = $EM_CONF[$extkey];
+
+					$command = "cd " . PATH_site . $config['added by t3tool']['path'] . $extkey . '; ';
+					$command .= 'grep -rni --include=ext_tables.php --include=ext_localconf.php "TYPO3_CONF_VARS.*SC_OPTIONS" .';
+					$output = NULL;
+
+					exec($command, $output);
+					if (sizeof($output)) {
+
+						foreach ($output as $occurence) {
+							if (preg_match(';TYPO3_CONF_VARS.*SC_OPTIONS.\]\[.([^ \]]+).\]\[.([^ \]]+).\];', $occurence, $m)) {
+
+								$id = $m[1] . ':' . $m[2];
+
+								$bySubscriber[$extkey][$id] = TRUE;
+								$byBroadcaster[$id][$extkey] = TRUE;
+
+							}
+
+						}
+					}
+
+					$out .= print_R($byBroadcaster, TRUE);
+
+
+				}
+
+
+					return $out;
 				break;
 
 			//
@@ -841,6 +886,7 @@ Special options for commands dependencies and mentions
 		return array(
 			"ext" => array(
 				'dependencies' => 1,
+				'health-check' => 1,
 				'install' => 't3tool_ext_completion_exts',
 				'list' => 1,
 				'mentions' => 't3tool_ext_completion_exts,t3tool_ext_completion_exts',

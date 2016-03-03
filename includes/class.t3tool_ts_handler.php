@@ -306,19 +306,20 @@
 		/**
 		 * Load and concat TS from dir.
 		 * Path can be a file or directory.
+		 * Will only read files with extensions .ts or .txt
 		 *
 		 * @param $path
 		 */
 		public static function readTsFromDirectory($path) {
-
 			$path = rtrim($path, '/');
 			$ts = "\n#\n# " . $path . "\n#\n";
 
 			if (is_file($path)) {
-				if (preg_match('/\.(ts)$/', $path)) {
+				if (preg_match('/\.(ts)|(txt)$/', $path)) {
 					$ts .= file_get_contents($path);
 				}
 			}
+
 			if (is_dir($path)) {
 				foreach (scandir($path) as $file) {
 					if ($file{0} == '.') {

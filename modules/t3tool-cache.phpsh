@@ -32,6 +32,48 @@
 				t3tool_cache_clear_single($cache);
 				break;
 
+			case 'list' :
+				$cache = $args[0];
+				if (! $cache) {
+					output_usage('Usage:
+  t3tool cache list <cache>
+
+');
+				}
+				if (in_array($cache, t3tool_cache_get_db_caches())) {
+					$table = $cache;
+					if (preg_match('/^cf_/', $table)) {
+						$tagsTable = $table . '_tags';
+						$entries = sql_get_rows("
+							select *, group_concat(t.tag) as tags
+							from $table as c
+							left join $tagsTable as t
+								on c.identifier=t.identifier
+							group by c.identifier
+							limit 30
+						");
+					} else {
+						$entries = sql_get_rows("select * from $table limit 30");
+					}
+
+					foreach ($entries as $entry) {
+						$out[] = array(
+							'id' => $entry['id'],
+							'identifier' => $entry['identifier'],
+							'size' => strlen($entry['content']) . 'b',
+							'expires' => dateFormat($entry['expires']),
+							'tags' => $entry['tags'],
+
+						);
+					}
+					return sendAsFlatTable($out);
+
+
+				}
+
+
+
+				break;
 			/**
 			 *
 			 */
@@ -56,32 +98,50 @@
 			case 'stat' :
 
 				foreach (t3tool_cache_get_db_caches() as $cache => $table) {
-					if (!$table) {
+					if (!$table || is_array($table)) {
 						continue;
 					}
 					$temp = sql_get_row("select count(*) as count from $table;");
-					if ($temp) {
-						$out[] = array(
-							'cache' => $table,
-							'count' => $temp['count'],
-							'timestamp' => $timestamp ? dateFormat($timestamp) : '',
-						);
+					$count = $temp['count'];
+
+					$temp = sql_get_row("select * from $table limit 1;");
+					$minMax = '';
+					if (isset($temp['expires'])) {
+						$temp = sql_get_row("select min(expires) as mi, max(expires) as ma from $table");
+						$minMax = dateFormat($temp['mi']) . ' - ' . dateFormat($temp['ma']);
 					}
+
+					if (preg_match('/^cf_/', $table)) {
+						$tagsTable = $table . '_tags';
+						$temp = sql_get_row("select count(*) as count from $tagsTable;");
+						$tagsCount = $temp['count'];
+					}
+
+
+					$out[] = array(
+							'cache' => $table,
+							'entries' => $count,
+							'timestamp' => $timestamp ? dateFormat($timestamp) : '',
+							'expires' => $minMax,
+							'tags' => $tagsCount,
+						);
 				}
 
 				foreach (t3tool_cache_get_file_caches() as $cache => $dir) {
-					if (substr($dir, -1) == '*') {
-						$cacheFile = t3tool_find_cache_file($dir);
-						$count = $cacheFile ? 1 : 0;
-						$timestamp = filemtime(PATH_site . 'typo3temp/' . $cacheFile);
-					} else {
-						$count = t3tool_count_files_recursive(PATH_site . 'typo3temp/' . $dir);
+					if (! is_array($dir)) {
+						if (substr($dir, -1) == '*') {
+							$cacheFile = t3tool_find_cache_file($dir);
+							$count = $cacheFile ? 1 : 0;
+							$timestamp = filemtime(PATH_site . 'typo3temp/' . $cacheFile);
+						} else {
+							$count = t3tool_count_files_recursive(PATH_site . 'typo3temp/' . $dir);
+						}
+						$out[] = array(
+							'cache' => $cache,
+							'entries' => $count,
+							'timestamp' => $timestamp ? dateFormat($timestamp) : '',
+						);
 					}
-					$out[] = array(
-						'cache' => $cache,
-						'count' => $count,
-						'timestamp' => $timestamp ? dateFormat($timestamp) : '',
-					);
 				}
 
 
@@ -157,6 +217,7 @@
 	 * @return bool|void
 	 */
 	function t3tool_cache_clear_single($cache) {
+		var_dump($cache);
 		if ($cache == 'realurl') {
 			$filename = PATH_site . 'typo3conf/realurl_autoconf.php';
 			if (is_file($filename)) {
@@ -187,21 +248,32 @@
 
 			} else {
 
-				output_cmd("Clearing cache in typo3temp/" . $file_caches[$cache]);
-				// v 6.x
+				list($type, $name) = explode(':', $cache);
+				switch ($type) {
 
-				if (substr($file_caches[$cache], -1) == '*') {
-					$filename = t3tool_find_cache_file($file_caches[$cache]);
-					$count = $filename ? 1 : 0;
-					if ($count) {
-						unlink(PATH_site . 'typo3temp/' . $filename);
-					}
-				} else {
-					$count = rmdir_recursive(PATH_site . 'typo3temp/' . $file_caches[$cache]);
+					case 'cache' :
+						t3tool_cache_clear_single($name);
+						break;
+
+					case 'path' :
+
+						output_cmd("Clearing cache in typo3temp/" . $name);
+						// v 6.x
+
+						if (substr($name, -1) == '*') {
+							$filename = t3tool_find_cache_file($name);
+							$count = $filename ? 1 : 0;
+							if ($count) {
+								unlink(PATH_site . 'typo3temp/' . $filename);
+							}
+						} else {
+							$count = rmdir_recursive(PATH_site . 'typo3temp/' . $name);
+						}
+
+						output_info($count . ($count == 1 ? ' entry' : ' entries'));
+						output_ok();
+					break;
 				}
-
-				output_info($count . ' entries');
-				output_ok();
 			}
 
 		}
@@ -316,44 +388,46 @@
 		return array(
 			// multiple caches :
 			'file' => array(
-				'code',
-				'data',
+				'cache:code',
+				'cache:data',
+				'path:Cache'
 			),
 			'code' => array(
-				'core',
-				'fluid'
+				'cache:core',
+				'cache:fluid',
+				'path:Cache/Code'
 			),
 			'core' => array(
-				'ext_localconf',
-				'ext_tables',
-				'classloader',
-				'tca',
-				'sprites',
-				'packagemanager',
-				'packageobjects',
+				'cache:ext_localconf',
+				'cache:ext_tables',
+				'cache:classloader',
+				'cache:tca',
+				'cache:sprites',
+				'cache:packagemanager',
+				'cache:packageobjects',
 			),
 			'data' => array(
-				'classes',
-				'l10n',
+				'cache:classes',
+				'cache:l10n',
 			),
 			'ext' => array(
-				'ext_localconf',
-				'ext_tables',
+				'cache:ext_localconf',
+				'cache:ext_tables',
 			),
 
 
 			// single caches :
-			'ext_localconf' => 'Cache/Code/cache_core/ext_localconf_*',
-			'ext_tables' => 'Cache/Code/cache_core/ext_tables_*',
-			'classloader' => 'Cache/Code/cache_core/ClassLoader_*',
-			'tca' => 'Cache/Code/cache_core/tca_base_*',
-			'fluid' => 'Cache/Code/fluid_template',
-			'classes' => 'Cache/Data/cache_classes',
-			'l10n' => 'Cache/Data/l10n',
-			'sprites' => 'Cache/Code/cache_core/sprites_*',
-			'packagemanager' => 'Cache/Code/cache_core/PackageManager_*',
-			'packageobjects' => 'Cache/Code/cache_core/PackageObjects_*',
-			'pics' => 'pics/',
+			'ext_localconf' => 'path:Cache/Code/cache_core/ext_localconf_*',
+			'ext_tables' => 'path:Cache/Code/cache_core/ext_tables_*',
+			'classloader' => 'path:Cache/Code/cache_core/ClassLoader_*',
+			'tca' => 'path:Cache/Code/cache_core/tca_base_*',
+			'fluid' => 'path:Cache/Code/fluid_template',
+			'classes' => 'path:Cache/Data/cache_classes',
+			'l10n' => 'path:Cache/Data/l10n',
+			'sprites' => 'path:Cache/Code/cache_core/sprites_*',
+			'packagemanager' => 'path:Cache/Code/cache_core/PackageManager_*',
+			'packageobjects' => 'path:Cache/Code/cache_core/PackageObjects_*',
+			'pics' => 'path:pics/',
 
 		);
 
@@ -379,9 +453,7 @@
 		foreach ($tables as $table) {
 			$temp = each($table);
 			$table = $temp[1];
-			if (preg_match('/^(cache)|(cf)_/i', $table) ||
-				preg_match('/cache/i', $table)
-			) {
+			if ((preg_match('/^(cache)|(cf)_/i', $table) || preg_match('/cache/i', $table)) && !preg_match('/_tags$/', $table)){
 				$out[$table] = $table;
 			}
 		}

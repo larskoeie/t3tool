@@ -1,437 +1,437 @@
 <?php
-/**
- * t3tool-user.phpsh
- *
- * Handling of backend users and backend user groups.
- *
- * @package t3tool
- * @author Lars Køie
- *
- */
+	/**
+	 * t3tool-user.phpsh
+	 *
+	 * Handling of backend users and backend user groups.
+	 *
+	 * @package t3tool
+	 * @author Lars Køie
+	 *
+	 */
 
-/**
- * @param $args
- */
-function t3tool_user_handlecmd($args) {
-    $level = 0;
+	/**
+	 * @param $args
+	 */
+	function t3tool_user_handlecmd($args) {
+		$level = 0;
 
-    $cmd = strtolower(array_shift($args));
-    $username = trim(strtolower($args[0]));
-    $users = t3tool_get_records_by_string('be_users', $username, array(
-        'username',
-        'email'
-    ));
+		$cmd = strtolower(array_shift($args));
+		$username = trim(strtolower($args[0]));
+		$users = t3tool_get_records_by_string('be_users', $username, array(
+			'username',
+			'email'
+		));
 
-    switch ($cmd) {
+		switch ($cmd) {
 
-        //
-        // Create admin user
-        //
-        case 'create' :
-            $password = trim($args[1]);
-            if (!$username) {
-                output_usage("Usage:\n  t3tool user create <username> [<password>]\n  Password will be prompted if not supplied.\n");
-                return FALSE;
-            }
-            $existing = sql_get_row("select uid from be_users where username like '$username'");
-            if ($existing) {
-                output_fail("User '$username' already exists. Use 't3tool user password' for changing password.\n", $level);
+			//
+			// Create admin user
+			//
+			case 'create' :
+				$password = trim($args[1]);
+				if (!$username) {
+					output_usage("Usage:\n  t3tool user create <username> [<password>]\n  Password will be prompted if not supplied.\n");
+					return FALSE;
+				}
+				$existing = sql_get_row("select uid from be_users where username like '$username'");
+				if ($existing) {
+					output_fail("User '$username' already exists. Use 't3tool user password' for changing password.\n", $level);
 
-                return FALSE;
-            }
-            if (!$password) {
-                $password = readPassword();
-            }
-            if (!$password) {
-                output_fail("Password can not be empty.", $level);
-            }
-            output_cmd('Creating user "' . $username . '"');
-            sql_query("insert into be_users (username, password, admin) values ('$username', md5('$password'), 1)");
-            output_ok('', $level);
+					return FALSE;
+				}
+				if (!$password) {
+					$password = readPassword();
+				}
+				if (!$password) {
+					output_fail("Password can not be empty.", $level);
+				}
+				output_cmd('Creating user "' . $username . '"');
+				sql_query("insert into be_users (username, password, admin) values ('$username', md5('$password'), 1)");
+				output_ok('', $level);
 
-            return '';
+				return '';
 
-            break;
+				break;
 
-        //
-        // Set user's password from clear text
-        //
-        case 'password' :
-            $user = t3tool_get_single_record_by_string('be_users', $username, array(
-                'username',
-                'email'
-            ));
-            $username = $user['username'];
-            if (!$username) {
-                output_usage("Usage:\n  t3tool user password <username> [<password>]\n  Password will be prompted if not supplied.\n");
+			//
+			// Set user's password from clear text
+			//
+			case 'password' :
+				$user = t3tool_get_single_record_by_string('be_users', $username, array(
+					'username',
+					'email'
+				));
+				$username = $user['username'];
+				if (!$username) {
+					output_usage("Usage:\n  t3tool user password <username> [<password>]\n  Password will be prompted if not supplied.\n");
 
-                return FALSE;
-            }
-            $password = trim($args[1]);
-            if (!$password) {
-                $password = readPassword();
-            }
-            if (!$password) {
-                output_fail("Password can not be empty");
+					return FALSE;
+				}
+				$password = trim($args[1]);
+				if (!$password) {
+					$password = readPassword();
+				}
+				if (!$password) {
+					output_fail("Password can not be empty");
 
-                return FALSE;
-            }
-            output_cmd("Changing password for user $username.");
-            $GLOBALS['t3tool_data']['stored_passwords'][$user['uid']][time()] = $user['password'];
-            writeData();
-            sql_query("update be_users set password=md5('$password') where uid=" . $user['uid']);
-            output_ok();
+					return FALSE;
+				}
+				output_cmd("Changing password for user $username.");
+				$GLOBALS['t3tool_data']['stored_passwords'][$user['uid']][time()] = $user['password'];
+				writeData();
+				sql_query("update be_users set password=md5('$password') where uid=" . $user['uid']);
+				output_ok();
 
-            return '';
-            break;
+				return '';
+				break;
 
-        case 'password-hashed' :
-            $user = t3tool_get_single_record_by_string('be_users', $username, array(
-                'username',
-                'email'
-            ));
-            $username = $user['username'];
-            if (!$username) {
-                output_usage("Usage:\n  t3tool user password-hashed <username> [<password>]\n  Password will be prompted if not supplied.\n");
+			case 'password-hashed' :
+				$user = t3tool_get_single_record_by_string('be_users', $username, array(
+					'username',
+					'email'
+				));
+				$username = $user['username'];
+				if (!$username) {
+					output_usage("Usage:\n  t3tool user password-hashed <username> [<password>]\n  Password will be prompted if not supplied.\n");
 
-                return '';
-            }
-            output_cmd("Changing password for user $username.");
+					return '';
+				}
+				output_cmd("Changing password for user $username.");
 
-            $password = trim($args[1]);
-            if (!$password) {
-                $password = readPassword();
-            }
-            if (!$password) {
-                output_info("Password can not be empty");
-                output_fail();
-                return FALSE;
-            }
-            $GLOBALS['t3tool_data']['stored_passwords'][$user['uid']][time()] = $user['password'];
-            writeData();
-            sql_query("update be_users set password='$password' where uid=" . $user['uid']);
-            output_ok();
+				$password = trim($args[1]);
+				if (!$password) {
+					$password = readPassword();
+				}
+				if (!$password) {
+					output_info("Password can not be empty");
+					output_fail();
+					return FALSE;
+				}
+				$GLOBALS['t3tool_data']['stored_passwords'][$user['uid']][time()] = $user['password'];
+				writeData();
+				sql_query("update be_users set password='$password' where uid=" . $user['uid']);
+				output_ok();
 
-            return '';
+				return '';
 
-            break;
-        //
-        // Retrieve
-        // TODO : finish this or remove it
-        case 'passwordrevert' :
-            $user = t3tool_get_single_record_by_string('be_users', $username, array(
-                'username',
-                'email'
-            ));
-            if (!is_array($GLOBALS['t3tool_data']['stored_passwords'][$user['uid']])) {
-                output_fail("No stored passwords for user\n");
+				break;
+			//
+			// Retrieve
+			// TODO : finish this or remove it
+			case 'passwordrevert' :
+				$user = t3tool_get_single_record_by_string('be_users', $username, array(
+					'username',
+					'email'
+				));
+				if (!is_array($GLOBALS['t3tool_data']['stored_passwords'][$user['uid']])) {
+					output_fail("No stored passwords for user\n");
 
-                return FALSE;
-            }
+					return FALSE;
+				}
 
-            $index = $args[1];
-            if (!trim($index)) {
-                output_usage("Usage\n");
+				$index = $args[1];
+				if (!trim($index)) {
+					output_usage("Usage\n");
 
-                return FALSE;
-            }
+					return FALSE;
+				}
 
-            break;
-        //
-        // List user groups
-        //
-        case 'groups' :
-            $groups = t3tool_get_records_by_string('be_groups', $username, array('title'), 'uid, title');
+				break;
+			//
+			// List user groups
+			//
+			case 'groups' :
+				$groups = t3tool_get_records_by_string('be_groups', $username, array('title'), 'uid, title');
 
-            if (!$groups) {
-                output_info("No matching groups.\n");
+				if (!$groups) {
+					output_info("No matching groups.\n");
 
-                return '';
-            }
+					return '';
+				}
 
-            return sendAsFlatTable($groups);
+				return sendAsFlatTable($groups);
 
-            break;
+				break;
 
-        //
-        // Create BE user group
-        //
-        case 'creategroup' :
-            if (!$username) {
-                output_usage("Usage:\n  t3tool user creategroup <name>\n");
-                return FALSE;
-            }
-            $existing = sql_get_row("select uid from be_groups where be_groups.title like '$username'");
-            if ($existing) {
-                output_fail("Group '$username' already exists.\n", $level);
-                return FALSE;
-            }
-            output_cmd('Creating user group "' . $username . '"');
-            sql_query("insert into be_groups (title) values ('$username')");
-            output_ok('', $level);
+			//
+			// Create BE user group
+			//
+			case 'creategroup' :
+				if (!$username) {
+					output_usage("Usage:\n  t3tool user creategroup <name>\n");
+					return FALSE;
+				}
+				$existing = sql_get_row("select uid from be_groups where be_groups.title like '$username'");
+				if ($existing) {
+					output_fail("Group '$username' already exists.\n", $level);
+					return FALSE;
+				}
+				output_cmd('Creating user group "' . $username . '"');
+				sql_query("insert into be_groups (title) values ('$username')");
+				output_ok('', $level);
 
-            return '';
+				return '';
 
-            break;
+				break;
 
-        //
-        // Find a user group and show all fields
-        //
-        case 'showgroup' :
-            $group = t3tool_get_single_record_by_string('be_groups', $args[0], array('title'));
-            return sendRecordAsTable($group);
-            break;
+			//
+			// Find a user group and show all fields
+			//
+			case 'showgroup' :
+				$group = t3tool_get_single_record_by_string('be_groups', $args[0], array('title'));
+				return sendRecordAsTable($group);
+				break;
 
-        //
-        // Find members of a user group
-        //
-        case 'members' :
-            $group = t3tool_get_single_record_by_string('be_groups', $args[0], array('title'));
-            $users = sql_get_rows('select uid, disable, username, realName, email
+			//
+			// Find members of a user group
+			//
+			case 'members' :
+				$group = t3tool_get_single_record_by_string('be_groups', $args[0], array('title'));
+				$users = sql_get_rows('select uid, disable, username, realName, email
       from be_users
       where find_in_set(' . $group['uid'] . ', usergroup)');
 
-            if (!$users) {
-                output_info("No members.\n");
+				if (!$users) {
+					output_info("No members.\n");
 
-                return '';
-            }
+					return '';
+				}
 
-            return sendAsFlatTable($users);
-            break;
+				return sendAsFlatTable($users);
+				break;
 
-        //
-        // Delete single user.
-        //
-        case 'deletegroup' :
-            if (!trim($username)) {
-                return ("Usage : t3tool user deletegroup <title>. NO going back!");
-            }
+			//
+			// Delete single user.
+			//
+			case 'deletegroup' :
+				if (!trim($username)) {
+					return ("Usage : t3tool user deletegroup <title>. NO going back!");
+				}
 
-            // TODO : confirm when deleting more than XX ?
-            $groups = t3tool_get_records_by_string('be_groups', $username, array('title'));
+				// TODO : confirm when deleting more than XX ?
+				$groups = t3tool_get_records_by_string('be_groups', $username, array('title'));
 
-            foreach ($groups as $group) {
-                output_cmd(sprintf('Deleting backend user group "%s"', $group['title']));
-                sql_query("delete from be_groups where uid =  " . $group['uid'] . " limit 1");
-                output_ok('', $level);
-            }
-            break;
-        //
-        // Add a group to a user
-        //
-        case 'addgroup' :
+				foreach ($groups as $group) {
+					output_cmd(sprintf('Deleting backend user group "%s"', $group['title']));
+					sql_query("delete from be_groups where uid =  " . $group['uid'] . " limit 1");
+					output_ok('', $level);
+				}
+				break;
+			//
+			// Add a group to a user
+			//
+			case 'addgroup' :
 
-            $groups = t3tool_get_records_by_string('be_groups', $args[1], array('title'));
-            foreach ($users as $user) {
-                $hasgroups = array();
-                if (trim($user['usergroup'])) {
-                    $hasgroups = explode(',', trim($user['usergroup']));
-                }
-                foreach ($groups as $group) {
-                    if (!in_array($group['uid'], $hasgroups)) {
-                        $hasgroups[] = $group['uid'];
-                    }
-                    output_cmd(sprintf('Adding group %s to backend user %s', $group['title'], $user['username']), $level);
-                    sql_query('update be_users set usergroup="' . implode(',', $hasgroups) . '" where uid = ' . $user['uid']);
-                    output_ok();
-                }
-            }
-            break;
+				$groups = t3tool_get_records_by_string('be_groups', $args[1], array('title'));
+				foreach ($users as $user) {
+					$hasgroups = array();
+					if (trim($user['usergroup'])) {
+						$hasgroups = explode(',', trim($user['usergroup']));
+					}
+					foreach ($groups as $group) {
+						if (!in_array($group['uid'], $hasgroups)) {
+							$hasgroups[] = $group['uid'];
+						}
+						output_cmd(sprintf('Adding group %s to backend user %s', $group['title'], $user['username']), $level);
+						sql_query('update be_users set usergroup="' . implode(',', $hasgroups) . '" where uid = ' . $user['uid']);
+						output_ok();
+					}
+				}
+				break;
 
-        //
-        // Remove a group from a user
-        //
-        case 'rmgroup' :
-            $groups = t3tool_get_records_by_string('be_groups', $args[1], array('title'));
-            foreach ($users as $user) {
+			//
+			// Remove a group from a user
+			//
+			case 'rmgroup' :
+				$groups = t3tool_get_records_by_string('be_groups', $args[1], array('title'));
+				foreach ($users as $user) {
 
-                $hasgroups = array_fill_keys(explode(',', trim($user['usergroup'])), TRUE);
-                foreach ($groups as $group) {
-                    unset($hasgroups[$group['uid']]);
+					$hasgroups = array_fill_keys(explode(',', trim($user['usergroup'])), TRUE);
+					foreach ($groups as $group) {
+						unset($hasgroups[$group['uid']]);
 
-                    output_cmd('Removing group %s from backend user %s', $group['title'], $user['username']);
-                    sql_query('update be_users set usergroup="' . implode(',', array_keys($hasgroups)) . '" where uid = ' . $user['uid']);
-                    output_ok('', $level);
-                }
-            }
-            return '';
-            break;
+						output_cmd('Removing group %s from backend user %s', $group['title'], $user['username']);
+						sql_query('update be_users set usergroup="' . implode(',', array_keys($hasgroups)) . '" where uid = ' . $user['uid']);
+						output_ok('', $level);
+					}
+				}
+				return '';
+				break;
 
-        //
-        // Make a user admin
-        //
-        case 'setadmin' :
-            foreach ($users as $user) {
+			//
+			// Make a user admin
+			//
+			case 'setadmin' :
+				foreach ($users as $user) {
 
-                output_cmd('Setting backend user "' . $user['username'] . '" as admin', $level);
-                sql_query('update be_users set admin=1 where uid = ' . $user['uid']);
-                output_ok('', $level);
-            }
-            return '';
-            break;
+					output_cmd('Setting backend user "' . $user['username'] . '" as admin', $level);
+					sql_query('update be_users set admin=1 where uid = ' . $user['uid']);
+					output_ok('', $level);
+				}
+				return '';
+				break;
 
-        //
-        // Make a user non-admin
-        //
-        case 'clradmin' :
-            foreach ($users as $user) {
-                output_cmd('Setting backend user "' . $user['username'] . '" to non-admin"');
-                sql_query('update be_users set admin=0     where uid = ' . $user['uid']);
-                output_ok('', $level);
-            }
-            return '';
-            break;
+			//
+			// Make a user non-admin
+			//
+			case 'clradmin' :
+				foreach ($users as $user) {
+					output_cmd('Setting backend user "' . $user['username'] . '" to non-admin"');
+					sql_query('update be_users set admin=0     where uid = ' . $user['uid']);
+					output_ok('', $level);
+				}
+				return '';
+				break;
 
-        //
-        // List users
-        //
-        case 'list' :
-        case 'ls' :
-            $users = t3tool_get_records_by_string('be_users', $username, array(
-                'username',
-                'email'
-            ), 'uid, username, email, disable, concat(substring(password, 1, 8), "...") as password');
+			//
+			// List users
+			//
+			case 'list' :
+			case 'ls' :
+				$users = t3tool_get_records_by_string('be_users', $username, array(
+					'username',
+					'email'
+				), 'uid, username, email, disable, concat(substring(password, 1, 8), "...") as password');
 
-            if (!$users) {
-                output_info("No matching backend users.\n");
-            } else {
-                return sendAsFlatTable($users);
-            }
+				if (!$users) {
+					output_info("No matching backend users.\n");
+				} else {
+					return sendAsFlatTable($users);
+				}
 
-            return '';
-            break;
+				return '';
+				break;
 
-        //
-        // Search for user(s) and show all fields.
-        //
-        case 'show' :
-            if (!trim($username)) {
-                output_usage("Usage : t3tool user show <query>. Case insensitive.\n");
-            }
-            $user = t3tool_get_single_record_by_string('be_users', $username, array(
-                'username',
-                'email'
-            ));
-            if (trim($user['uc'])) {
-                $uc = unserialize($user['uc']);
-            }
-			unset($user['uc']);
+			//
+			// Search for user(s) and show all fields.
+			//
+			case 'show' :
+				if (!trim($username)) {
+					output_usage("Usage : t3tool user show <query>. Case insensitive.\n");
+				}
+				$user = t3tool_get_single_record_by_string('be_users', $username, array(
+					'username',
+					'email'
+				));
+				if (trim($user['uc'])) {
+					$uc = unserialize($user['uc']);
+				}
+				unset($user['uc']);
 
-            return sendRecordAsTable($user) .
-			print_r($uc, TRUE);
-            break;
+				return sendRecordAsTable($user) .
+				print_r($uc, TRUE);
+				break;
 
-        //
-        // Enable single user.
-        //
-        case 'enable' :
-            if (!trim($username)) {
-                output_usage("Usage : t3tool user enable <username or uid>. Case insensitive.\n");
-            }
-            foreach ($users as $user) {
+			//
+			// Enable single user.
+			//
+			case 'enable' :
+				if (!trim($username)) {
+					output_usage("Usage : t3tool user enable <username or uid>. Case insensitive.\n");
+				}
+				foreach ($users as $user) {
 
-                if ($user['disable'] == 0) {
-                    output_info($user['username'] . " already enabled.\n");
-                }
+					if ($user['disable'] == 0) {
+						output_info($user['username'] . " already enabled.\n");
+					}
 
-                output_cmd("Enabling backend user " . $user['username']);
-                sql_query("update be_users set disable=0 where uid= " . $user['uid'] . " limit 1");
-                output_ok('', $level);
-            }
-            return '';
+					output_cmd("Enabling backend user " . $user['username']);
+					sql_query("update be_users set disable=0 where uid= " . $user['uid'] . " limit 1");
+					output_ok('', $level);
+				}
+				return '';
 
-            break;
+				break;
 
-        //
-        // Disable single user
-        //
-        case 'disable' :
-            if (!trim($username)) {
-                output_usage("Usage : t3tool user disable <username or uid>. Case insensitive.");
-            }
-            foreach ($users as $user) {
+			//
+			// Disable single user
+			//
+			case 'disable' :
+				if (!trim($username)) {
+					output_usage("Usage : t3tool user disable <username or uid>. Case insensitive.");
+				}
+				foreach ($users as $user) {
 
-                if ($user['disable'] == 1) {
-                    output_info($user['username'] . " already disabled.\n");
-                }
-                output_cmd("Disabling backend user " . $user['username']);
+					if ($user['disable'] == 1) {
+						output_info($user['username'] . " already disabled.\n");
+					}
+					output_cmd("Disabling backend user " . $user['username']);
 
-                sql_query("update be_users set disable=1 where uid =  " . $user['uid'] . " limit 1");
-                output_ok('', $level);
-            }
-            return '';
+					sql_query("update be_users set disable=1 where uid =  " . $user['uid'] . " limit 1");
+					output_ok('', $level);
+				}
+				return '';
 
-            break;
+				break;
 
-        //
-        // Remove email address
-        //
-        case 'removeemail' :
-            if (!trim($username)) {
-                output_usage("Usage : t3tool user removeemail <username or uid>. Case insensitive.");
-            }
-            foreach ($users as $user) {
-                output_cmd("Removing email from backend user " . $user['username']);
-                sql_query("update be_users set email='removed' where uid =  " . $user['uid'] . " limit 1");
-                output_ok('', $level);
-            }
-            return '';
+			//
+			// Remove email address
+			//
+			case 'removeemail' :
+				if (!trim($username)) {
+					output_usage("Usage : t3tool user removeemail <username or uid>. Case insensitive.");
+				}
+				foreach ($users as $user) {
+					output_cmd("Removing email from backend user " . $user['username']);
+					sql_query("update be_users set email='removed' where uid =  " . $user['uid'] . " limit 1");
+					output_ok('', $level);
+				}
+				return '';
 
-            break;
+				break;
 
-        //
-        // Delete single user.
-        //
-        case 'delete' :
-            if (!trim($username)) {
-                return ("Usage : t3tool user delete <username or uid>. Case insensitive. NO going back!");
-            }
+			//
+			// Delete single user.
+			//
+			case 'delete' :
+				if (!trim($username)) {
+					return ("Usage : t3tool user delete <username or uid>. Case insensitive. NO going back!");
+				}
 
-            // TODO : confirm when deleting more than XX ?
+				// TODO : confirm when deleting more than XX ?
 
-            foreach ($users as $user) {
+				foreach ($users as $user) {
 
-                output_cmd('Deleting backend user "' . $user['username'] . '"');
-                sql_query("delete from be_users where uid =  " . $user['uid'] . " limit 1");
-                output_ok('', $level);
-            }
-            break;
+					output_cmd('Deleting backend user "' . $user['username'] . '"');
+					sql_query("delete from be_users where uid =  " . $user['uid'] . " limit 1");
+					output_ok('', $level);
+				}
+				break;
 
-        // --- Below here is stuff related to logged in users (sessions) - should maybe be moved to another module.
+			// --- Below here is stuff related to logged in users (sessions) - should maybe be moved to another module.
 
-        //
-        // List backend users currently logged in.
-        //
-        case 'online' :
-            $users = sql_get_rows('
+			//
+			// List backend users currently logged in.
+			//
+			case 'online' :
+				$users = sql_get_rows('
         select uid, username, from_unixtime(ses_tstamp) as last_activity, timediff(now(), from_unixtime(ses_tstamp)) as age, ses_id as cookie
         from be_sessions
         left join be_users on be_sessions.ses_userid=be_users.uid
         ');
-            return sendAsFlatTable($users);
+				return sendAsFlatTable($users);
 
-            break;
+				break;
 
-        //
-        // Kick backend user off system.
-        //
-        case 'kick' :
-            if (!trim($username)) {
-                return ("Usage : t3tool user kick <username or uid>.");
-            }
+			//
+			// Kick backend user off system.
+			//
+			case 'kick' :
+				if (!trim($username)) {
+					return ("Usage : t3tool user kick <username or uid>.");
+				}
 
-            foreach ($users as $user) {
-                output_cmd('Kicking backend user "' . $user['username'] . '" off system');
-                sql_query('delete from be_sessions where ses_userid=' . $user['uid']);
-                output_ok('', $level);
-            }
+				foreach ($users as $user) {
+					output_cmd('Kicking backend user "' . $user['username'] . '" off system');
+					sql_query('delete from be_sessions where ses_userid=' . $user['uid']);
+					output_ok('', $level);
+				}
 
-            return '';
-            break;
+				return '';
+				break;
 
-        default :
-            return ("Backend user commands:
+			default :
+				return ("Backend user commands:
   t3tool user list [<query>]
     List all users.
   t3tool user show <query>
@@ -465,28 +465,28 @@ function t3tool_user_handlecmd($args) {
     Kick user off system.
     ");
 
-    }
-}
+		}
+	}
 
-function t3tool_user_cmdaliases() {
-    return array(
-        'ublk' => 'user disable',
-        'ucan' => 'user delete',
-        'ucrt' => 'user create',
-        'uinf' => 'user show',
-        'upwd' => 'user password',
-        'urol' => 'user addgroup',
-        'urrol' => 'user rmgroup',
-        'uublk' => 'user enable',
-    );
+	function t3tool_user_cmdaliases() {
+		return array(
+			'ublk' => 'user disable',
+			'ucan' => 'user delete',
+			'ucrt' => 'user create',
+			'uinf' => 'user show',
+			'upwd' => 'user password',
+			'urol' => 'user addgroup',
+			'urrol' => 'user rmgroup',
+			'uublk' => 'user enable',
+		);
 
-}
+	}
 
-/**
- * @return string
- */
-function t3tool_user_usage_short() {
-    return ("Backend user commands:
+	/**
+	 * @return string
+	 */
+	function t3tool_user_usage_short() {
+		return ("Backend user commands:
   t3tool user list - List all users.
   t3tool user show - Show details of single user.
   t3tool user enable - Enable single user.
@@ -503,13 +503,13 @@ function t3tool_user_usage_short() {
   t3tool user online - List logged in users.
   t3tool user kick - Kick user off system.
     ");
-}
+	}
 
-/**
- * @return string
- */
-function t3tool_user_usage_long() {
-    return ("Backend user commands:
+	/**
+	 * @return string
+	 */
+	function t3tool_user_usage_long() {
+		return ("Backend user commands:
   t3tool user list [<query>]
     List all users.
   t3tool user show <query>
@@ -543,57 +543,57 @@ function t3tool_user_usage_long() {
     Kick user off system.
     ");
 
-}
+	}
 
-function t3tool_user_completion() {
-    return array(
-        'user' => array(
-            'addgroup' => 't3tool_user_completion_users, t3tool_user_completion_groups',
-            'clradmin' => 't3tool_user_completion_users',
-            'create' => 1,
-            'creategroup' => 1,
-            'delete' => 't3tool_user_completion_users',
-            'deletegroup' => 't3tool_user_completion_groups',
-            'disable' => 't3tool_user_completion_users_enabled',
-            'enable' => 't3tool_user_completion_users_disabled',
-            'groups' => 't3tool_user_completion_users',
-            'list' => 1,
-            'members' => 't3tool_user_completion_groups',
-            'online' => 1,
-            'password' => 't3tool_user_completion_users',
-            'removeemail' => 't3tool_user_completion_users',
-            'rmgroup' => 't3tool_user_completion_users, t3tool_user_completion_groups',
-            'setgroup' => 't3tool_user_completion_users, t3tool_user_completion_groups',
-            'show' => 't3tool_user_completion_users',
-            'showgroup' => 't3tool_user_completion_groups',
-        ),
-    );
-}
+	function t3tool_user_completion() {
+		return array(
+			'user' => array(
+				'addgroup' => 't3tool_user_completion_users, t3tool_user_completion_groups',
+				'clradmin' => 't3tool_user_completion_users',
+				'create' => 1,
+				'creategroup' => 1,
+				'delete' => 't3tool_user_completion_users',
+				'deletegroup' => 't3tool_user_completion_groups',
+				'disable' => 't3tool_user_completion_users_enabled',
+				'enable' => 't3tool_user_completion_users_disabled',
+				'groups' => 't3tool_user_completion_users',
+				'list' => 1,
+				'members' => 't3tool_user_completion_groups',
+				'online' => 1,
+				'password' => 't3tool_user_completion_users',
+				'removeemail' => 't3tool_user_completion_users',
+				'rmgroup' => 't3tool_user_completion_users, t3tool_user_completion_groups',
+				'setgroup' => 't3tool_user_completion_users, t3tool_user_completion_groups',
+				'show' => 't3tool_user_completion_users',
+				'showgroup' => 't3tool_user_completion_groups',
+			),
+		);
+	}
 
-/**
- * @return array
- */
-function t3tool_user_completion_users() {
-    return sql_get_column('select username from be_users where not deleted');
-}
+	/**
+	 * @return array
+	 */
+	function t3tool_user_completion_users() {
+		return sql_get_column('select username from be_users where not deleted');
+	}
 
-/**
- * @return array
- */
-function t3tool_user_completion_users_enabled() {
-    return sql_get_column('select username from be_users where not deleted and not disable ');
-}
+	/**
+	 * @return array
+	 */
+	function t3tool_user_completion_users_enabled() {
+		return sql_get_column('select username from be_users where not deleted and not disable ');
+	}
 
-/**
- * @return array
- */
-function t3tool_user_completion_users_disabled() {
-    return sql_get_column('select username from be_users where not deleted and disable');
-}
+	/**
+	 * @return array
+	 */
+	function t3tool_user_completion_users_disabled() {
+		return sql_get_column('select username from be_users where not deleted and disable');
+	}
 
-/**
- * @return array
- */
-function t3tool_user_completion_groups() {
-    return sql_get_column('select title from be_groups where not deleted');
-}
+	/**
+	 * @return array
+	 */
+	function t3tool_user_completion_groups() {
+		return sql_get_column('select title from be_groups where not deleted');
+	}

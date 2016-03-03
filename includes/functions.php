@@ -1633,3 +1633,10 @@ Options:
 
 		return '';
 	}
+
+	if (! function_exists('yaml_emit')) {
+		function yaml_emit ($data) {
+			require_once PATH_script . 'lib/Spyc/Spyc.php';
+			return spyc_dump($data);
+		}
+	}
