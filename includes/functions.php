@@ -483,9 +483,7 @@ Options:
 	 *
 	 * @return string
 	 */
-	function cropAndHilite($s, $q) {
-		$before_len = 10;
-		$after_len = 10;
+	function cropAndHilite($s, $q, $format = 'shell', $before_len = 10, $after_len = 10) {
 
 		$out = '';
 
@@ -529,6 +527,9 @@ Options:
 		return $record;
 	}
 
+	function t3tool_chunk_and_indent ($s, $indent, $width = 150) {
+		return chunk_split($s, $width, "\r\n" . str_repeat(OUTPUT_INDENT, $indent));
+	}
 
 	/**
 	 * Converts .... something ....
@@ -825,7 +826,13 @@ Options:
 		// need not be objects, could be arrays
 		if (is_array($prependObjects)) {
 			foreach ($prependObjects as $label => $o) {
-				$out .= COLOR_BOLD . "$label :\n" . COLOR_RESET . print_r($o, TRUE);
+				if (is_array($o)) {
+					$out .= COLOR_BOLD . "$label :\n" . COLOR_RESET . yaml_emit($o);
+
+				} else {
+					$out .= COLOR_BOLD . "$label :\n" . COLOR_RESET . print_r($o, TRUE);
+
+				}
 			}
 		}
 
@@ -1418,7 +1425,7 @@ Options:
 	 * @param $s
 	 */
 	function output_cmd($s, $level = 0) {
-		$out = '[....] ' . $s;
+		$out = "\x1b[1G[....] " . $s;
 		t3tool_output($out);
 	}
 
@@ -1427,8 +1434,15 @@ Options:
 	 * @param int $level
 	 */
 	function output_cmd_success($out, $level = 0) {
+		if ($GLOBALS['progressActive']) {
+			t3tool_output("\e[1F");
+		}
 		// move all left and one right
 		t3tool_output("\x1b[200D\x1b[1C" . $out);
+		if ($GLOBALS['progressActive']) {
+			t3tool_output("\n");
+		}
+
 	}
 
 	/**
@@ -1464,6 +1478,20 @@ Options:
 
 		output_cmd_success($out, $level);
 		output_sendinfo($level + 1);
+	}
+
+	function output_progress_start () {
+		$out = "\n";
+
+		t3tool_output($out);
+		$GLOBALS['progressActive'] = TRUE;
+	}
+
+	/**
+	 *
+	 */
+	function output_progress_inc () {
+		echo ".";
 	}
 
 	function t3tool_output($s) {

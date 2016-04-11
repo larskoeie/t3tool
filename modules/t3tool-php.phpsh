@@ -14,20 +14,213 @@
    *
    */
   function t3tool_php_handlecmd($args) {
-    $php = $args[0];
+    $cmd = array_shift($args);
 
-    if (!trim($php)) {
-    }
+    switch ($cmd) {
 
-    $result = eval($php);
-    echo "\n";
+		case 'generate-phpunit' :
+			$dir = $args[0];
+			t3tool_php_generate_phpunit_testclass ($dir);
+
+			break;
+	}
 
 
   }
 
-  function t3tool_php_usage_short () {
+	/**
+	 * @param $dir string
+	 */
+	function t3tool_php_generate_phpunit_testclass ($dir) {
+
+		$dir = str_replace('//', '/', $dir);
+
+		if (is_dir($dir)) {
+			$dh = opendir($dir);
+			while ($f = readdir($dh)) {
+				if ($f{0} == '.') {
+					continue;
+				}
+				t3tool_php_generate_phpunit_testclass($dir . '/' . $f);
+			}
+		}
+		if (is_file($dir)) {
+
+
+			$classPath = dirname($dir);
+			$classFilename = basename($dir);
+			$testClassFile = str_replace(array('Classes', '.php'), array('Tests/Unit', 'Test.php'), $dir);
+			$testClassPath = dirname($testClassFile);
+			$classSource = file_get_contents($dir);
+
+			$testClassSource = '';
+			if (is_file($testClassFile)) {
+				$testClassSource = file_get_contents($testClassFile);
+			}
+
+			$namespace = '';
+			if (preg_match('/.*namespace +([^ ;]+)/i', $classSource, $m)) {
+				$namespace = $m[1] . '\\';
+			}
+
+			if (! preg_match('/.*class +([^ ;]+)/i', $classSource, $m)) {
+				return;
+			}
+
+			$className = trim($m[1], " \n");
+			$classNameFQ = '\\' . trim($namespace . $className, '\\');
+			$classInstanceName = strtolower($className{0}) . substr($className, 1);
+			$isAbstract = stristr($m[0], 'abstract');
+			$isFinal = stristr($m[0], 'final');
+
+			if ($isAbstract) {
+				output_cmd('Skipping abstract class ' . $namespace . $className);
+				output_ok();
+				return;
+			}
+
+			output_cmd('Building and writing test class for ' . $namespace . $className);
+
+			if (preg_match_all('/.*function +([^ ]+) *(\(.*\)) *{/i', $classSource, $m, PREG_SET_ORDER)) {
+
+				$hasNonStaticMethod = FALSE;
+
+				foreach ($m as $method) {
+					$methodName = $method[1];
+					$testMethodName = $methodName . 'Test';
+					$testMethodExists = strstr($testClassSource, 'function ' . $testMethodName);
+
+					// magic methods are not tested - not here, anyway
+					if (substr($methodName, 0, 2) == '__') {
+						continue;
+					}
+					if ($testMethodExists) {
+						continue;
+					}
+
+					// remove default values
+					$methodArgs = preg_replace('/ *=[^,)]+/', '', $method[2]);
+					// handle type hints
+					$methodDocBlock = '';
+						if (preg_match_all('/[,\(] *([^$][^ ]+) +(\$[^ ]+)[,\)]/', $methodArgs, $ma, PREG_SET_ORDER)) {
+							$methodDocBlock = "\t\t/**\n";
+							foreach ($ma as $m) {
+								$methodDocBlock .= "\t\t * @var " . $m[2] . ' ' . $m[1] . "\n";
+								$methodArgs = str_replace($m[1], '', $methodArgs);
+							}
+							$methodDocBlock .= "\t\t*/\n";
+
+						}
+					$isStatic = stristr($method[0], 'static');
+					$isPrivate = stristr($method[0], 'private');
+					$isProtected = stristr($method[0], 'protected');
+					$isPublic = ! ($isPrivate || $isProtected);
+					$hasNonStaticMethod |= !$isStatic;
+
+					if (! $isPublic) {
+						continue;
+					}
+
+					$out .= '
+	/**
+ 	 * @test
+	 */
+	public function ' . $testMethodName . ' () {
+' . $methodDocBlock . '';
+
+					if ($isStatic) {
+						$out .= "\t\t" . '$x = ' . $className . '::' . $methodName . $methodArgs . ';';
+					} else {
+						$out .= "\t\t" . '$x = $this->' . $classInstanceName . '->' . $methodName . $methodArgs . ';';
+					}
+
+					$out .= '
+
+	}
+
+	';
+
+
+				}
+			}
+
+
+			$out2 = "<?php
+
+/**
+ *
+ */
+class " . $className . "Test extends Tx_Phpunit_TestCase {
+";
+			if ($hasNonStaticMethod) {
+				$out2 .= '
+	/**
+	 * @var Tx_Phpunit_Framework
+	 */
+	protected $framework;
+
+	/**
+	 * @var ' . $classNameFQ . '
+	 */
+	protected $' . $classInstanceName . ';
+
+	/**
+	 * @var TYPO3\CMS\Core\Database\DatabaseConnection
+	 */
+	protected $database;
+
+	/**
+	 *
+	 */
+	public function setup () {
+		// @TODO : add extension key below here
+		$this->framework = new Tx_Phpunit_Framework(\'\');
+		$this->framework->markTableAsDirty(\'sys_template\');
+		$this->framework->createFakeFrontEnd(1);
+
+		$this->' . $classInstanceName . ' = new ' . $classNameFQ . '();
+		$this->database = new \TYPO3\CMS\Core\Database\DatabaseConnection();
+	}
+				 ';
+			}
+
+			$out2 .= $out . "
+}
+
+";
+
+			if (is_file($testClassFile)) {
+				output_info('Test class file exists, did not overwrite');
+
+				if (strlen($out)) {
+					output_info('but this is missing in class:' .  $out);
+				}
+				output_fail();
+
+			} else {
+				if (! is_dir($testClassPath)) {
+					mkdir($testClassPath, 0755, TRUE);
+				}
+				file_put_contents($testClassFile, $out2);
+				output_ok();
+			}
+
+		}
+	}
+
+	function t3tool_php_usage_short () {
     return ("Usage:
       t3tool php <php>
       ");
 
   }
+
+	function t3tool_php_completion() {
+		return array(
+			"php" => array(
+				'generate-phpunit' => '_path',
+			),
+
+		);
+
+	}

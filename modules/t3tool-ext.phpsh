@@ -57,6 +57,8 @@
 		}
 		$EM_CONF = array();
 		// these are the installed extensions
+
+		$order = 0;
 		foreach ($exts as $_EXTKEY) {
 			if (is_file("typo3conf/ext/$_EXTKEY/ext_emconf.php")) {
 				include_once(PATH_typo3conf . "ext/$_EXTKEY/ext_emconf.php");
@@ -74,6 +76,7 @@
 				$EM_CONF[$_EXTKEY]['added by t3tool']['type'] = 'System';
 			}
 			$EM_CONF[$_EXTKEY]['added by t3tool']['installed'] = TRUE;
+			$EM_CONF[$_EXTKEY]['added by t3tool']['order'] = ($order++);
 		}
 
 		// now add the extensions that are not installed
@@ -160,42 +163,30 @@
 
 		output_ok();
 
+
+
 		switch ($cmd) {
 
-			case 'analyse' :
+			/**
+			 *
+			 */
+			case 'update-doxygen' :
+				die;
+				if (!is_dir(PATH_t3tool . 'ext')) {
+					mkdir(PATH_t3tool . 'ext');
+				}
+				system('cd ' . PATH_t3tool . 'ext && rm -r *');
+				foreach ($showOnlyExts as $_EXTKEY) {
+					if ($EM_CONF[$_EXTKEY]['added by t3tool']['type'] == 'Local') {
+						system('cd ' . PATH_t3tool . 'ext/; ln -s ' . PATH_site . $EM_CONF[$_EXTKEY]['added by t3tool']['path'] . $_EXTKEY);
+					}
+				}
+				system('cd ' . PATH_t3tool . 'ext/; ln -s ' . PATH_site . 'typo3');
+				break;
+
+			case 'analyze' :
 
 				if (! $ext) {
-
-				}
-
-				$data =
-					@file_get_contents($EM_CONF[$ext]['added by t3tool']['path'] . $ext . '/ext_localconf.php') .
-					@file_get_contents($EM_CONF[$ext]['added by t3tool']['path'] . $ext . '/ext_tables.php') ;
-
-				$functions = array(
-					'addStaticFile',
-					'addModule',
-					'addPageTSConfig',
-					'addUserTSConfig',
-					'addTCAcolumns',
-					'addToAllTCAtypes',
-					'registerModule',
-
-				);
-
-				foreach ($searches as $pattern) {
-					if (preg_match_all('/' . $pattern . '/U', $data, $matches, PREG_SET_ORDER)) {
-						print_r($matches);
-
-					}
-
-				}
-
-				if (preg_match_all('/\$((GLOBALS)|(TCA)|(TYPO3_CONF_VARS)).+=.+;/U', $data, $matches)) {
-					foreach ($matches[0] as $m) {
-						echo "$m\n";
-
-					}
 
 				}
 
@@ -277,6 +268,7 @@
 					$config = $EM_CONF[$extkey];
 					if (!$ext || preg_match("/$ext/", $extkey) || preg_match("/$ext/", $config['title'])) {
 						$extdata = array(
+							'order' => $config['added by t3tool']['order'],
 							'key' => $extkey,
 							'version' => $config['version'],
 							'type' => $config['added by t3tool']['type'],
@@ -345,6 +337,8 @@
 				$to = $to ? explode(',', $to) : NULL;
 
 
+				$reportHtml = '<link rel="stylesheet" type="text/css" href="report.css">';
+
 				// make list of strings to search for
 				foreach ($EM_CONF as $_EXTKEY => $config) {
 					if ($EM_CONF[$_EXTKEY]['added by t3tool']['installed'] &&
@@ -363,6 +357,8 @@
 						!in_array($_EXTKEY, $exclude)
 
 					) {
+
+						$reportHtml .= '<h1>' . $_EXTKEY . '</h1>';
 
 						$path = $EM_CONF[$_EXTKEY]['added by t3tool']['path'] . $_EXTKEY;
 						foreach ($prefixes as $dependee => $temp) {
@@ -386,12 +382,23 @@
 							if ($dependee != $_EXTKEY) {
 								if ($_EXTKEY != $__EXTKEY) {
 									output_cmd('Searching ' . $_EXTKEY);
-									$__EXTKEY = $_EXTKEY;
+									output_progress_start();
 								}
+
+								$dependencyExists = isset($by_depender_wo_version[$_EXTKEY][$dependee]);
 
 								foreach ($temp as $prefix) {
 									$command = "cd $path; ";
-									$command .= 'grep -rni --exclude="composer.json" --exclude="ext_emconf.php"';
+									/**
+									 * Search recursively all of extension dir, but exclude
+									 * - ext_emconf.php, as it contains dependencies, not mentions
+									 * - composer.json, same reason
+									 * - .git/ as it contains old, possibly removed, code
+									 *
+									 * If file extensions to include is specified, use them.
+									 *
+									 */
+									$command .= 'grep -rni --exclude="composer.json" --exclude="ext_emconf.php" --exclude-dir=".git"';
 									if (getOption('include-files')) {
 										$command .= ' --include="' . getOption('include-files') . '"';
 									}
@@ -404,28 +411,31 @@
 
 										// determine file extensions
 										$fileextensions = array();
+										$reportHtml .= '<ul>';
 										foreach ($output as $file) {
 
 
-											$header_ext = "\n$_EXTKEY mentions $dependee :\n";
+											$header_ext = "\n$_EXTKEY -> $dependee :";
 
 											if ($header_ext != $_header_ext) {
 												$report .= $header_ext;
+												$reportHtml  .= '<h2>' . $header_ext . '</h2>';
 												$_header_ext = $header_ext;
 											}
-
 											if (preg_match(';^\./(.+\.([a-z0-9]{1,4})):([0-9]+):(.+)$;', $file, $m)) {
 												$filepath = $m[1];
 												$fileextension = $m[2];
 												$linenum = $m[3];
-												$linenum_padded = str_pad($line, 4, ' ', STR_PAD_LEFT);
+												$linenum_padded = str_pad($linenum, 4, ' ', STR_PAD_LEFT);
 												$line = trim($m[4], " \t");
 
 												if ($filepath != $_filepath) {
-													$report .= "\n\n  $filepath";
+													$report .= "\n  $filepath";
+													$reportHtml .= '<h3>' . $filepath . "</h3>\n";
 													$_filepath = $filepath;
 												}
-												$report .= "\n    $linenum_padded : $line";
+												$report .= "\n    $linenum_padded: " . t3tool_chunk_and_indent($line, 5);
+												$reportHtml .= '<li>' . $linenum_padded . ' :<pre> ' . htmlentities($line) . '</pre></li>';
 												$fileextensions[$fileextension] = TRUE;
 
 												if (getOption('git')) {
@@ -436,19 +446,26 @@
 												}
 											}
 										}
+										$reportHtml .= '</ul>';
 
 										$mentions[$_EXTKEY][$dependee] = implode(',', array_keys($fileextensions)) . ' (' . sizeof($output) . ')';
 
 
 									}
 
+									echo ".";
 								}
-								output_ok();
+								if ($_EXTKEY != $__EXTKEY) {
+									output_ok();
+									$__EXTKEY = $_EXTKEY;
+								}
 
 							}
 
 						}
+						$reportHtml .= '<img src="mentions-' . $_EXTKEY . '.png">';
 					}
+
 				}
 
 				if (TRUE) {
@@ -459,9 +476,7 @@
 					return;
 				}
 
-				print_r($mentions);
-
-				if (getOption('dot')) {
+				// now build dot files
 					$graphLabel = 'Extension mentions';
 
 					$output = "digraph extension_mentions {
@@ -473,9 +488,19 @@
 overlap=scalexy;
 nodesep=0.6;
 ";
-// 			rankdir = BT;
+
 
 					foreach (array_keys($mentions_exts) as $ext) {
+						$dot[$ext] =  "digraph extension_mentions {
+
+				size =\"60,60\";
+				label = \"$graphLabel\"
+				labelloc = \"t\";
+			sep=\"+25,25\";
+overlap=scalexy;
+nodesep=0.6;
+rankdir = BT;
+";
 						if ($EM_CONF[$ext]['added by t3tool']['type'] == 'Local') {
 							$output .= "  $ext [shape=box];\n";
 						} else {
@@ -506,15 +531,30 @@ nodesep=0.6;
 //								$linestyle = 'bold';
 							}
 
-							$output .= "  $depender $arrow $dependee [label=\"$info\" style=\"$linestyle\"];\n";
+							$dotLine = "  $depender $arrow $dependee [label=\"$info\" style=\"$linestyle\"];\n";
+
+							$output .= $dotLine;
+							$dot[$depender] .= $dotLine;
+							$dot[$dependee] .= $dotLine;
 						}
 					}
 					$output .= "      subgraph cluster_legend {
 depender [shape=box,pos=\"3000,3000\"];\n dependee [shape=box];\n depender -> dependee [label=\"filetypes (mentions count)\" style=\"solid\"];\n";
 					$output .= "  mentioner [shape=box];\n mentioned [shape=box];\n mentioner -> mentioned [label=\"filetypes (mentions count)\" style=\"dashed\"];\n";
 					$output .= "}";
+
+
 					$output .= "}
 				";
+
+				if (!is_dir(PATH_t3tool . 'dot')) {
+					mkdir(PATH_t3tool . 'dot', 0777, TRUE);
+				}
+
+				foreach ($dot as $e => &$y) {
+						$y .= "}";
+						file_put_contents(PATH_t3tool . 'dot/mentions-' . $e, $y);
+					}
 
 					$outputFile = getOption('output');
 					if ($outputFile) {
@@ -522,8 +562,17 @@ depender [shape=box,pos=\"3000,3000\"];\n dependee [shape=box];\n depender -> de
 					} else {
 						echo $output;
 					}
-				}
 
+
+
+				if (!is_dir(PATH_reports)) {
+					mkdir(PATH_reports, 0777, TRUE);
+				}
+				file_put_contents(PATH_reports . 'mentions.html', $reportHtml);
+
+				foreach ($dot as $e => $y) {
+					system('dot -Tpng ' . PATH_t3tool . 'dot/mentions-' . $e . ' -o ' . PATH_reports . 'mentions-' . $e . '.png');
+				}
 				break;
 
 			#
@@ -857,9 +906,11 @@ nodesep=0.6;
     Show which extensions mentions other extensions in their code. If a single extension key is provided, mentions will be limited to
   	those involving that extension (either way). If an additional extension key is provided, they will be further limited to only mentions
   	of the last one, by the first one.
+  t3tool ext update-doxygen (name is not great, and will probably change)
+  	Create symlinks in .t3tool/ext to all extensions and TYPO3 core (for definition of "all", see below).
 
 Options :
-   Default is that only local, installed extensions will be shown. The following options will change that :
+   Default is that only local, installed extensions will be included in command. The following options will change that :
     --inactive
       Include inactive (not installed) extensions.
     --system
@@ -885,6 +936,7 @@ Special options for commands dependencies and mentions
 	function t3tool_ext_completion() {
 		return array(
 			"ext" => array(
+				'analyze' => 't3tool_ext_completion_exts',
 				'dependencies' => 1,
 				'health-check' => 1,
 				'install' => 't3tool_ext_completion_exts',

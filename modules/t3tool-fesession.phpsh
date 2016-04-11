@@ -37,6 +37,21 @@
 				return sendRecordAsTable($item);
 
 			/**
+			 * Show a single session data entry
+			 */
+			case 'follow' :
+				// @TODO : experimental - rewrite and generalize !
+				while (TRUE) {
+					$item = t3tool_get_single_record_by_string('fe_session_data', $q . '*', array('hash'));
+					echo TOPLEFT;
+					echo time() ."\n";
+					echo sendRecordAsTable($item);
+
+					sleep(0.2);
+				}
+
+
+			/**
 			 *
 			 */
 			case 'delete' :

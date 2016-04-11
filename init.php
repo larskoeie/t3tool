@@ -24,9 +24,12 @@
     define('PATH_site', getcwd() . '/');
     define('PATH_typo3conf', PATH_site . 'typo3conf/');
     define('PATH_t3lib', PATH_site . 't3lib/');
+    define('PATH_t3tool', PATH_site . '../.t3tool/');
+    define('PATH_reports', '/var/www/documentation/http/reports/');
 
 	// set indentation string
 	define('INDENT', "\t");
+	define('OUTPUT_INDENT', "  ");
 
 	// define some colors
 	define('COLOR_BOLD', "\x1b[1;1m");
@@ -35,6 +38,8 @@
 	define('COLOR_PURPLE', "\x1b[1;35m");
 	define('COLOR_GREEN', "\x1b[1;32m");
 	define('COLOR_YELLOW', "\x1b[1;33m");
+	define('CLEARSCREEN', "\x1b[1;2J");
+	define('TOPLEFT', "\x1b[1;1H");
 
 	define('COLOR_BG_YELLOW', "\x1b[1;43m");
 
@@ -69,6 +74,7 @@
         'log',
         'page',
         'plugin',
+		'php',
         'realurl',
         'registry',
         'search',

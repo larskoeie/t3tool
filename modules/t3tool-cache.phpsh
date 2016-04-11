@@ -34,7 +34,7 @@
 
 			case 'list' :
 				$cache = $args[0];
-				if (! $cache) {
+				if (!$cache) {
 					output_usage('Usage:
   t3tool cache list <cache>
 
@@ -70,7 +70,6 @@
 
 
 				}
-
 
 
 				break;
@@ -119,16 +118,16 @@
 
 
 					$out[] = array(
-							'cache' => $table,
-							'entries' => $count,
-							'timestamp' => $timestamp ? dateFormat($timestamp) : '',
-							'expires' => $minMax,
-							'tags' => $tagsCount,
-						);
+						'cache' => $table,
+						'entries' => $count,
+						'timestamp' => $timestamp ? dateFormat($timestamp) : '',
+						'expires' => $minMax,
+						'tags' => $tagsCount,
+					);
 				}
 
 				foreach (t3tool_cache_get_file_caches() as $cache => $dir) {
-					if (! is_array($dir)) {
+					if (!is_array($dir)) {
 						if (substr($dir, -1) == '*') {
 							$cacheFile = t3tool_find_cache_file($dir);
 							$count = $cacheFile ? 1 : 0;
@@ -140,6 +139,8 @@
 							'cache' => $cache,
 							'entries' => $count,
 							'timestamp' => $timestamp ? dateFormat($timestamp) : '',
+							'expires' => '',
+							'tags' => '',
 						);
 					}
 				}
@@ -217,7 +218,6 @@
 	 * @return bool|void
 	 */
 	function t3tool_cache_clear_single($cache) {
-		var_dump($cache);
 		if ($cache == 'realurl') {
 			$filename = PATH_site . 'typo3conf/realurl_autoconf.php';
 			if (is_file($filename)) {
@@ -245,38 +245,42 @@
 				foreach ($file_caches[$cache] as $temp) {
 					t3tool_cache_clear_single($temp);
 				}
-
 			} else {
-
-				list($type, $name) = explode(':', $cache);
-				switch ($type) {
-
-					case 'cache' :
-						t3tool_cache_clear_single($name);
-						break;
-
-					case 'path' :
-
-						output_cmd("Clearing cache in typo3temp/" . $name);
-						// v 6.x
-
-						if (substr($name, -1) == '*') {
-							$filename = t3tool_find_cache_file($name);
-							$count = $filename ? 1 : 0;
-							if ($count) {
-								unlink(PATH_site . 'typo3temp/' . $filename);
-							}
-						} else {
-							$count = rmdir_recursive(PATH_site . 'typo3temp/' . $name);
-						}
-
-						output_info($count . ($count == 1 ? ' entry' : ' entries'));
-						output_ok();
-					break;
-				}
+					t3tool_cache_clear_single($file_caches[$cache]);
 			}
 
 		}
+
+
+		list($type, $name) = explode(':', $cache);
+		if (trim($name)) {
+			switch ($type) {
+
+				case 'cache' :
+					t3tool_cache_clear_single($name);
+					break;
+
+				case 'path' :
+
+					output_cmd("Clearing cache in typo3temp/" . $name);
+					// v 6.x
+
+					if (substr($name, -1) == '*') {
+						$filename = t3tool_find_cache_file($name);
+						$count = $filename ? 1 : 0;
+						if ($count) {
+							unlink(PATH_site . 'typo3temp/' . $filename);
+						}
+					} else {
+						$count = rmdir_recursive(PATH_site . 'typo3temp/' . $name);
+					}
+
+					output_info($count . ($count == 1 ? ' entry' : ' entries'));
+					output_ok();
+					break;
+			}
+		}
+
 
 
 		if (isset($db_caches[$cache])) {
@@ -284,13 +288,16 @@
 				foreach (t3tool_cache_get_db_caches() as $table) {
 					if (trim($table)) {
 						t3tool_cache_truncate_table($table);
+						if (preg_match('/^cf_/', $table)) {
+							t3tool_cache_truncate_table($table . '_tags');
+						}
 					}
 				}
 
 				return TRUE;
 			}
-			if (is_array($cb_caches[$cache])) {
-				foreach ($cb_caches[$cache] as $temp) {
+			if (is_array($db_caches[$cache])) {
+				foreach ($db_caches[$cache] as $temp) {
 					t3tool_cache_clear_single($temp);
 				}
 			} else {
@@ -453,7 +460,7 @@
 		foreach ($tables as $table) {
 			$temp = each($table);
 			$table = $temp[1];
-			if ((preg_match('/^(cache)|(cf)_/i', $table) || preg_match('/cache/i', $table)) && !preg_match('/_tags$/', $table)){
+			if ((preg_match('/^(cache)|(cf)_/i', $table) || preg_match('/cache/i', $table)) && !preg_match('/_tags$/', $table)) {
 				$out[$table] = $table;
 			}
 		}
