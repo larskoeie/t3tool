@@ -164,7 +164,6 @@
 		output_ok();
 
 
-
 		switch ($cmd) {
 
 			/**
@@ -326,6 +325,34 @@
 					return "No installed extensions\n";
 				}
 				break;
+
+            /**
+             * List of extension keys - nothing else.
+             * Alphabetical order.
+             * Useful for making a diff between two sites.
+             */
+            case 'key-list' :
+
+                foreach ($showOnlyExts as $i => $extkey) {
+                    $config = $EM_CONF[$extkey];
+                    if (!$ext || preg_match("/$ext/", $extkey) || preg_match("/$ext/", $config['title'])) {
+                        $extdata = array(
+                            'key' => $extkey,
+                        );
+
+                        $extlist[$extkey] = $extdata;
+                    }
+                }
+
+                if (sizeof($extlist)) {
+                    ksort($extlist);
+                    $extlist = array_values($extlist);
+                    return "Installed extensions:\n" . sendAsFlatTable($extlist);
+                } else {
+                    return "No installed extensions\n";
+                }
+
+                break;
 
 			case 'mentions' :
 
@@ -897,6 +924,8 @@ nodesep=0.6;
 		return ('Extension commands:
   t3tool ext list <part of extension key>
     List installed extensions
+  t3tool ext key-list <part of extension key>
+    List installed extensions, but with extension key only
   t3tool show <extension key>
     Show extension detail
   t3tool ext dependencies [<extension key>] [<extension key>]
@@ -941,6 +970,7 @@ Special options for commands dependencies and mentions
 				'health-check' => 1,
 				'install' => 't3tool_ext_completion_exts',
 				'list' => 1,
+				'key-list' => 1,
 				'mentions' => 't3tool_ext_completion_exts,t3tool_ext_completion_exts',
 				'show' => 't3tool_ext_completion_exts',
 				'uninstall' => 't3tool_ext_completion_exts',
