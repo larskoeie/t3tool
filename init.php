@@ -31,6 +31,10 @@
 	define('INDENT', "\t");
 	define('OUTPUT_INDENT', "  ");
 
+
+    //
+    define('CHECKMARK', "\xe2\x9c\x93");
+
 	// define some colors
 	define('COLOR_BOLD', "\x1b[1;1m");
 	define('COLOR_RED', "\x1b[1;31m");

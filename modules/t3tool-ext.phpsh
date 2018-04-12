@@ -364,6 +364,8 @@
 				$to = $to ? explode(',', $to) : NULL;
 
 
+                $mentionsStruct = [];
+
 				$reportHtml = '<link rel="stylesheet" type="text/css" href="report.css">';
 
 				// make list of strings to search for
@@ -373,8 +375,10 @@
 						!in_array($_EXTKEY, $exclude)
 					) {
 						$prefixes[$_EXTKEY][] = $_EXTKEY;
+						$prefixes[$_EXTKEY][] = str_replace('_', '', $_EXTKEY);
 						$prefixes[$_EXTKEY][] = 'tx_' . str_replace('_', '', $_EXTKEY);
 					}
+
 				}
 
 				// do search
@@ -406,15 +410,19 @@
 								}
 							}
 
-							if ($dependee != $_EXTKEY) {
+
+                            if ($dependee != $_EXTKEY) {
 								if ($_EXTKEY != $__EXTKEY) {
 									output_cmd('Searching ' . $_EXTKEY);
 									output_progress_start();
 								}
+                                $linenumbers = [];
+                                $fileHunks = [];
 
 								$dependencyExists = isset($by_depender_wo_version[$_EXTKEY][$dependee]);
 
 								foreach ($temp as $prefix) {
+								    //echo "$prefix ,";
 									$command = "cd $path; ";
 									/**
 									 * Search recursively all of extension dir, but exclude
@@ -433,14 +441,15 @@
 									$output = NULL;
 									exec($command, $output);
 									if (sizeof($output)) {
+
 										$mentions_exts[$_EXTKEY] = 1;
 										$mentions_exts[$dependee] = 1;
 
 										// determine file extensions
 										$fileextensions = array();
 										$reportHtml .= '<ul>';
-										foreach ($output as $file) {
 
+										foreach ($output as $file) {
 
 											$header_ext = "\n$_EXTKEY -> $dependee :";
 
@@ -456,7 +465,15 @@
 												$linenum_padded = str_pad($linenum, 4, ' ', STR_PAD_LEFT);
 												$line = trim($m[4], " \t");
 
+                                                $linenumbers[$filepath][$linenum] = 1;
+
 												if ($filepath != $_filepath) {
+                                                    $mention = array(
+	            								        'file' => $filepath,
+	            								        'extension' => $fileextension,
+	            								        'linenum' =>  $linenum,
+	            								        'code' => $line,
+                                                    );
 													$report .= "\n  $filepath";
 													$reportHtml .= '<h3>' . $filepath . "</h3>\n";
 													$_filepath = $filepath;
@@ -465,12 +482,20 @@
 												$reportHtml .= '<li>' . $linenum_padded . ' :<pre> ' . htmlentities($line) . '</pre></li>';
 												$fileextensions[$fileextension] = TRUE;
 
-												if (getOption('git')) {
-													$command = "cd $path; if [ -a .git ]; then git blame -L $linenum,$linenum $filepath; fi";
-													$output = array();
-													exec($command, $output);
-													$report .= "\n      " . $output[0] . "\n";
-												}
+                                                /**
+                                                 * Git blame
+                                                 */
+                                                $command = "cd $path; if [ -f .git ]; then git blame -L $linenum,$linenum $filepath; fi";
+                                                $output = array();
+                                                exec($command, $output);
+                                                if (trim($output[0])) {
+                                                    $report .= "\n      " . $output[0] . "\n";
+                                                    $mention['commit'] = array(
+                                                        'blame' => $output[0],
+                                                    );
+                                                }
+
+
 											}
 										}
 										$reportHtml .= '</ul>';
@@ -479,9 +504,33 @@
 
 
 									}
-
 									echo ".";
 								}
+										if (sizeof($linenumbers)) {
+
+foreach ($linenumbers as $file => $linenums) {
+    $codeLines = file(PATH_site . $path . '/' . $file);
+
+    // run through all hunks, and add the search strings that each of them contain
+    foreach (t3tool_convert_linenumbers_to_hunks($linenums, $codeLines) as $hunk) {
+        $strings = [];
+        $roles = [];
+        foreach ($hunk['code'] as $codeLine) {
+            foreach ($temp as $prefix) {
+                if (preg_match(';' . $prefix . ';i', $codeLine)) {
+                    $strings[$prefix] = TRUE;
+                    $roles[t3tool_code_get_string_role($codeLine, $prefix)] = TRUE;
+                }
+            }
+        }
+        $hunk['strings'] = array_keys($strings);
+        $hunk['roles'] = array_keys($roles);
+        print_r($hunk);
+        $mentionsStruct[$_EXTKEY][$dependee]['mentions'][$file][] = $hunk;
+    }
+
+}
+										}
 								if ($_EXTKEY != $__EXTKEY) {
 									output_ok();
 									$__EXTKEY = $_EXTKEY;
@@ -494,6 +543,8 @@
 					}
 
 				}
+
+				file_put_contents(PATH_t3tool . 'mentions.json', json_encode($mentionsStruct, JSON_PRETTY_PRINT));
 
 				if (TRUE) {
 					echo $report;
@@ -595,12 +646,82 @@ depender [shape=box,pos=\"3000,3000\"];\n dependee [shape=box];\n depender -> de
 				if (!is_dir(PATH_reports)) {
 					mkdir(PATH_reports, 0777, TRUE);
 				}
-				file_put_contents(PATH_reports . 'mentions.html', $reportHtml);
+				file_put_contents(PATH_reports . 'full_mentions.html', $reportHtml);
 
 				foreach ($dot as $e => $y) {
-					system('dot -Tpng ' . PATH_t3tool . 'dot/mentions-' . $e . ' -o ' . PATH_reports . 'mentions-' . $e . '.png');
+//					system('dot -Tpng ' . PATH_t3tool . 'dot/mentions-' . $e . ' -o ' . PATH_reports . 'mentions-' . $e . '.png');
 				}
 				break;
+
+            case 'mentions-report' :
+
+
+                if (! is_dir(PATH_reports . 'mentions/data/')) {
+                    mkdir(PATH_reports . 'mentions/data/', 0777, TRUE);
+                }
+
+                $json = file_get_contents(PATH_t3tool . 'mentions.json');
+                $mentions = json_decode($json, JSON_OBJECT_AS_ARRAY);
+
+                $extHtml = [];
+
+                foreach ($mentions as $dependerKey => $dependees) {
+
+                    $extHtml[$dependerKey] = $dependerKey;
+
+                    foreach ($dependees as $dependeeKey => $dependee) {
+                        $dependeeHtml = '';
+                        foreach ($dependee['mentions'] as $file => $hunks) {
+                            $fileHtml = '';
+                                $fileHtml .= '<table class="codelines diff-table">';
+                            foreach ($hunks as $hunkNum => $hunk) {
+                                $hunkHtml = '';
+
+                                $hunkHtml .= '<tr><td class=\'linenumber blob-num blob-num-expandable\'><svg aria-hidden="true" class="octicon octicon-unfold" height="16" version="1.1" viewBox="0 0 14 16" width="14"><path fill-rule="evenodd" d="M11.5 7.5L14 10c0 .55-.45 1-1 1H9v-1h3.5l-2-2h-7l-2 2H5v1H1c-.55 0-1-.45-1-1l2.5-2.5L0 5c0-.55.45-1 1-1h4v1H1.5l2 2h7l2-2H9V4h4c.55 0 1 .45 1 1l-2.5 2.5zM6 6h2V3h2L7 0 4 3h2v3zm2 3H6v3H4l3 3 3-3H8V9z"></path></svg></td>';
+                                $hunkHtml .= sprintf("<td class='code blob-code blob-code-inner blob-code-hunk'>@@ +%d,%d @@ %s</td></tr>\n", $hunk['firstLine'], $hunk['lastLine'] - $hunk['firstLine'], $hunk['label']);
+                           $hunkHtml .= '<tr><td>' . implode($hunk['roles']) . '</td></tr>';
+
+                                foreach ($hunk['code'] as $lineNum => $codeLine) {
+                                    $codeLine = trim($codeLine, "\n");
+                                    $codeLine = htmlentities($codeLine);
+                                    $codeLine = str_replace(array("\t", " "), array("&nbsp;&nbsp;", "&nbsp;"), $codeLine);
+
+                                    $tdClasses0 = ['blob-num'];
+                                    $tdClasses1 = ['blob-code'];
+                                    foreach ($hunk['strings'] as $string) {
+                                        if (preg_match(';\b' . $string . '\b;i', $codeLine)) {
+                                            $tdClasses0[] = 'blob-num-addition';
+                                            $tdClasses1[] = 'blob-code-addition';
+                                            $codeLine = preg_replace(';\b' . $string . '\b;i', '<span class="x">\\0</span>', $codeLine);
+                                        }
+                                    }
+                                    $hunkHtml .= sprintf("<tr><td class='%s'>%s</td>", implode(' ', $tdClasses0), $lineNum);
+                                    $hunkHtml .= sprintf("<td class='%s'><span class='blob-code-inner'>%s</span></td>", implode(' ', $tdClasses1), $codeLine);
+                                    $hunkHtml .= '</tr>';
+                                }
+
+                                $hunkHtml .= '';
+//                                $fileHtml .= t3tool_report_write_report_part('mentions', $dependerKey . $dependeeKey . $file . $hunkNum, $hunkNum, $hunkHtml);
+                                $fileHtml .= $hunkHtml;
+                            }
+                                $fileHtml .= '</table>';
+                            $fileHeader = '<div class="file-header"><div class="file-info">' . $file . '</div></div>';
+                            $dependeeHtml .= t3tool_report_write_report_part('mentions', $dependerKey . $dependeeKey . $file, $fileHeader, $fileHtml);
+                        }
+                        $extHtml[$dependerKey] .= t3tool_report_write_report_part('mentions', $dependerKey . $dependeeKey, '-> ' . $dependeeKey, $dependeeHtml);
+                    }
+                }
+
+
+                $indexHtml = '
+                <link rel="stylesheet" href="https://assets-cdn.github.com/assets/github-d25fa5e2181a6ce90c617e1bfee9b3bac8a699af5bcb6fcbed090b7f422a628a.css">
+                ';
+                foreach ($extHtml as $ext => $html) {
+                    $indexHtml .= t3tool_report_write_report_part('mentions', $ext, $ext, $html);
+                }
+                file_put_contents(PATH_reports . 'mentions/data/index.html', $indexHtml);
+
+                break;
 
 			#
 			# Show content of ext_emconf.php file and global configuration.
@@ -682,7 +803,7 @@ depender [shape=box,pos=\"3000,3000\"];\n dependee [shape=box];\n depender -> de
 			case 'dependencies' :
 				echo "Dependencies by depender:\n";
 				foreach ($by_depender as $depender => $dependees) {
-					echo "  $depender :\n";
+					echo "  $depender -> :\n";
 					foreach ($dependees as $dependee => $version) {
 						echo "    $dependee $version\n";
 					}
@@ -692,7 +813,7 @@ depender [shape=box,pos=\"3000,3000\"];\n dependee [shape=box];\n depender -> de
 				echo "Dependencies by dependee:\n";
 				foreach ($by_dependee as $dependee => $versions) {
 					ksort($versions);
-					echo "  $dependee :\n";
+					echo "  -> $dependee :\n";
 					foreach ($versions as $version => $dependers) {
 						if (!$version) {
 							$version = 'any';
@@ -898,6 +1019,104 @@ nodesep=0.6;
 
 	}
 
+	function t3tool_report_write_report_part($reportKey, $key, $title, $content) {
+	    $key = md5($key);
+        $keyAbbr = substr($key, 0, 7);
+
+	    $html = "
+            <div class='expandable key-$keyAbbr' data-key='$key' data-keyabbr='$keyAbbr'>
+                <div class='header'>$title</div>
+                <div class='content'></div>
+            </div>";
+
+        file_put_contents(PATH_reports . $reportKey . '/data/' . $key . '.html', $content);
+        return $html;
+    }
+
+	function t3tool_convert_linenumbers_to_hunks (array $lineNumbers, array $codeLines){
+
+	    ksort($lineNumbers);
+        $lineNumbers = array_keys($lineNumbers);
+
+	    $hunks = [];
+        $hunk = NULL;
+        $_lineNumber = 0;
+	    foreach ($lineNumbers as $lineNumber) {
+	        if ($lineNumber > $_lineNumber + 5) {
+	            if ($hunk) {
+	                $hunks[] = $hunk;
+                }
+                $hunk = array(
+                    'firstLine' => $lineNumber - 3,
+                );
+            }
+            $hunk['lastLine'] = $lineNumber + 3;
+            $hunk['lineCount'] = $hunk['lastLine'] - $hunk['firstLine'] + 1;
+	        $_lineNumber = $lineNumber;
+        }
+	            $hunks[] = $hunk;
+
+        foreach ($hunks as &$hunk) {
+            $hunk['label'] = t3tool_code_get_hunk_label($codeLines, $hunk['firstLine']);
+            for ($l=$hunk['firstLine']; $l<$hunk['lastLine']+1; $l++) {
+                $hunk['code'][$l] = $codeLines[$l - 1];
+            }
+        }
+        return $hunks;
+    }
+
+    function t3tool_code_get_string_role ($code, $string) {
+        $code = trim($code);
+var_dump($code); var_dump($string);
+        if (preg_match('/use .+' . $string . '/i', $code)) {
+            return 'Use statement';
+        }
+
+        if (preg_match('/extends [^ ]*' . $string . '/i', $code)) {
+            return 'Class inheritance statement';
+        }
+
+        if (preg_match('/\'[^\']*' . $string . '[^\']*\'/i', $code)) {
+            return 'String literal';
+        }
+
+        if (preg_match('/"[^\"]*' . $string . '[^"]*"/i', $code)) {
+            return 'String literal';
+        }
+
+        return '?';
+    }
+
+    function t3tool_code_get_hunk_label (array $codeLines, $lineNum, $extension = 'php') {
+        $codeLine = $codeLines[$lineNum];
+        switch (strtolower($extension)) {
+            case 'js' :
+                for ($l = $lineNum; $l>0; $l--) {
+                    if (preg_match('/function/i', $codeLines[$l])) {
+                        return $codeLines[$l];
+                    }
+                }
+                break;
+
+            case 'php' :
+                if (preg_match('/\bfunction\b/i', $codeLine)) {
+                    for ($l = $lineNum; $l>0; $l--) {
+                        if (preg_match('/\bclass\b/i', $codeLines[$l])) {
+                            return $codeLines[$l];
+                        }
+                    }
+                }
+                for ($l = $lineNum; $l>0; $l--) {
+                    if (preg_match('/\bfunction\b/i', $codeLines[$l])) {
+                        return $codeLines[$l];
+                    }
+                }
+                break;
+        }
+
+        return '';
+    }
+
 	function t3tool_ext_cmdaliases() {
 		return array(
 			'dis' => 'ext disable',
@@ -932,7 +1151,7 @@ nodesep=0.6;
   	Show dependency information for all extensions. If a single extension key is provided, dependencies will be limited to
   	those involving that extension (either way). If an additional extension key is provided, they will be limited to depen
   t3tool ext mentions
-    Show which extensions mentions other extensions in their code. If a single extension key is provided, mentions will be limited to
+    Show which extensions mention other extensions in their code. If a single extension key is provided, mentions will be limited to
   	those involving that extension (either way). If an additional extension key is provided, they will be further limited to only mentions
   	of the last one, by the first one.
   t3tool ext update-doxygen (name is not great, and will probably change)

@@ -36,8 +36,28 @@
         break;
 
       case 'tail' :
-        sql_tail('select uid, tstamp, userid, details, log_data from sys_log order by uid desc');
-        break;
+          $sql = ('select uid, tstamp, userid, details, log_data from sys_log order by uid desc');
+
+          while (TRUE) {
+              $a = sql_get_rows($sql . ' limit 20');
+              $a = array_reverse($a);
+
+              foreach ($a as $y => $row) {
+                  if ($a[$y]['uid'] <= $last) {
+                      continue;
+                  }
+                  $last = $a[$y]['uid'];
+
+                  $row['tstamp'] = dateFormat($row['tstamp']);
+                  $tpl = "{tstamp}\n  {details}";
+                  echo t3tool_substitute_markers($tpl, $row) . "\n\n";
+
+
+              }
+              sleep(1);
+          }
+
+          break;
 
 
     }

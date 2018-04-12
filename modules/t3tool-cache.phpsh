@@ -91,6 +91,17 @@
 				return t3tool_cache_search_single($cache, $q);
 				break;
 
+            case 'show' :
+
+                $cache = $args[0];
+                $id = $args[1];
+
+                // cf_ table only
+                $record = sql_get_row('select * from ' . $cache . ' where identifier="' . $id . '"');
+                $record['content'] = unserialize($record['content']);
+                print_r($record);
+
+                break;
 			/**
 			 * Build stats table of all caches with number of entries in each.
 			 */
@@ -218,11 +229,12 @@
 	 * @return bool|void
 	 */
 	function t3tool_cache_clear_single($cache) {
+	    $success = TRUE;
 		if ($cache == 'realurl') {
 			$filename = PATH_site . 'typo3conf/realurl_autoconf.php';
 			if (is_file($filename)) {
 				output_cmd('Clearing realurl_autoconf.php');
-				unlink($filename);
+				$success &= @unlink($filename);
 				output_ok();
 			} else {
 				output_info('Not existing');
@@ -237,6 +249,7 @@
 		if ($cache == 'all') {
 			t3tool_cache_clear_single('db');
 			t3tool_cache_clear_single('file');
+			t3tool_cache_clear_single('autoload');
 			return TRUE;
 		}
 
@@ -269,14 +282,18 @@
 						$filename = t3tool_find_cache_file($name);
 						$count = $filename ? 1 : 0;
 						if ($count) {
-							unlink(PATH_site . 'typo3temp/' . $filename);
+							$success &= @unlink(PATH_site . 'typo3temp/' . $filename);
 						}
 					} else {
 						$count = rmdir_recursive(PATH_site . 'typo3temp/' . $name);
 					}
 
-					output_info($count . ($count == 1 ? ' entry' : ' entries'));
-					output_ok();
+					if ($count === FALSE) {
+					    output_fail('Permission denied');
+                    } else {
+                        output_info($count . ($count == 1 ? ' entry' : ' entries'));
+                        output_ok();
+                    }
 					break;
 			}
 		}
@@ -286,7 +303,7 @@
 		if (isset($db_caches[$cache])) {
 			if ($cache == 'db') {
 				foreach (t3tool_cache_get_db_caches() as $table) {
-					if (trim($table)) {
+					if (is_string($table) && trim($table)) {
 						t3tool_cache_truncate_table($table);
 						if (preg_match('/^cf_/', $table)) {
 							t3tool_cache_truncate_table($table . '_tags');
@@ -324,15 +341,20 @@
 		$files = scandir(PATH_typo3conf);
 		foreach ($files as $file) {
 			if (preg_match('/^temp_CACHED/', $file)) {
-				unlink(PATH_typo3conf . $file);
+				$success &= @unlink(PATH_typo3conf . $file);
 			}
 		}
 
 		// v 6.x
 		$count = rmdir_recursive(PATH_site . 'typo3temp/Cache/Code/');
 
-		output_info($count . ' entries');
-		output_ok();
+        if ($count === FALSE) {
+            output_fail('Permission denied');
+        } else {
+
+            output_info($count . ' entries');
+            output_ok();
+        }
 	}
 
 
@@ -341,6 +363,7 @@
   t3tool cache clear content - Truncate all cache tables.
   t3tool cache clear code - Delete all cached code from extensions.
   t3tool cache clear db - Truncate all cache tables in DB.
+  t3tool cache clear autoload - Purge autoloader cache.
   t3tool cache clear all - All of the above.
   t3tool cc pics - Empty typo3temp/pics.
   ");
@@ -375,7 +398,7 @@
 			'cache' => array(
 				'clear' => 't3tool_cache_completion_caches',
 				'list' => 't3tool_cache_completion_caches',
-				'show' => 1,
+				'show' => 't3tool_cache_completion_caches',
 				'search' => 't3tool_cache_completion_caches',
 				'stat' => 1,
 			),
@@ -435,7 +458,7 @@
 			'packagemanager' => 'path:Cache/Code/cache_core/PackageManager_*',
 			'packageobjects' => 'path:Cache/Code/cache_core/PackageObjects_*',
 			'pics' => 'path:pics/',
-
+			'autoload' => 'path:autoload/',
 		);
 
 	}
@@ -548,10 +571,12 @@
 			if (is_dir("$dir/$file")) {
 				$count += rmdir_recursive("$dir/$file");
 			} else {
-				unlink("$dir/$file");
+				@unlink("$dir/$file");
 				$count++;
 			}
 		}
-		rmdir($dir);
+		if (! @rmdir($dir)) {
+		    return FALSE;
+        }
 		return $count;
 	}

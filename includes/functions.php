@@ -198,10 +198,19 @@ Options:
 		global $TYPO3_CONF_VARS;
 
 		$db = $TYPO3_CONF_VARS['DB'];
-		$typo_db_host = $db['host'];
-		$typo_db_username = $db['username'];
-		$typo_db_password = $db['password'];
-		$typo_db = $db['database'];
+
+        if (isset($db['Connections']['Default'])) {
+            $db = $db['Connections']['Default'];
+            $typo_db_host = $db['host'];
+            $typo_db_username = $db['user'];
+            $typo_db_password = $db['password'];
+            $typo_db = $db['dbname'];
+        } else {
+            $typo_db_host = $db['host'];
+            $typo_db_username = $db['username'];
+            $typo_db_password = $db['password'];
+            $typo_db = $db['database'];
+        }
 
 		if (!$typo_db) {
 			die("Error: Can't connect to DB. Halting.\n\n");
@@ -667,6 +676,11 @@ Options:
 
 		}
 
+		if ($q == 'LAST_UID') {
+		    $temp = sql_get_row('select max(uid) as m from ' . $table);
+            $q = $temp['m'];
+        }
+
 		$q = strtolower($q);
 
 		if (!is_array($fields)) {
@@ -896,7 +910,7 @@ Options:
 		}
 
 		$s = preg_replace(";\n|\r\t;", ' ', $s);
-		$s = crop($s);
+		$s = crop($s, 150);
 
 		return $s;
 	}
@@ -1384,6 +1398,26 @@ Options:
 
 	}
 
+/**
+ * Handlebars style
+ *
+ * @param $tpl
+ * @param $record
+ * @return mixed
+ */
+	function t3tool_substitute_markers($tpl, $record) {
+	    $markers = [];
+        foreach ($record as $k => $v) {
+            $markers['{' . $k . '}'] = $v;
+        }
+
+	    return str_replace(
+	        array_keys($markers),
+            array_values($markers),
+            $tpl
+        );
+    }
+
 	/**
 	 * Enable realtime output to stdout.
 	 */
@@ -1425,7 +1459,7 @@ Options:
 	 * @param $s
 	 */
 	function output_cmd($s, $level = 0) {
-		$out = "\x1b[1G[....] " . $s;
+		$out = "\x1b[1G ....  " . $s;
 		t3tool_output($out);
 	}
 
@@ -1450,6 +1484,7 @@ Options:
 	 */
 	function output_ok($s = '', $level = 0) {
 		$out = ' ok ';
+        $out = ' ' . CHECKMARK . '  ';
 		// add green
 		$out = "\x1b[1;32m$out\x1b[0m\n";
 
@@ -1474,7 +1509,7 @@ Options:
 	function output_fail($s = '', $level = 0) {
 		$out = 'fail';
 		// add red
-		$out = "\x1b[1;31m$out\x1b[0m\n";
+		$out = COLOR_RED . $out . COLOR_RESET;
 
 		output_cmd_success($out, $level);
 		output_sendinfo($level + 1);
@@ -1661,6 +1696,18 @@ Options:
 
 		return '';
 	}
+
+    /**
+     * @return bool
+     *
+     */
+	function t3tool_require_change_permission () {
+	    if (getOption('no-change')) {
+    	    die ("No changes to system are allowed - halting\n");
+        }
+        return TRUE;
+    }
+
 
 	if (! function_exists('yaml_emit')) {
 		function yaml_emit ($data) {

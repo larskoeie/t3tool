@@ -81,7 +81,7 @@
 
 			output_cmd('Building and writing test class for ' . $namespace . $className);
 
-			if (preg_match_all('/.*function +([^ ]+) *(\(.*\)) *{/i', $classSource, $m, PREG_SET_ORDER)) {
+			if (preg_match_all('/.*function +([^ ]+) *(\(.*\)) */i', $classSource, $m, PREG_SET_ORDER)) {
 
 				$hasNonStaticMethod = FALSE;
 
@@ -102,6 +102,7 @@
 					$methodArgs = preg_replace('/ *=[^,)]+/', '', $method[2]);
 					// handle type hints
 					$methodDocBlock = '';
+						var_dump($methodArgs);
 						if (preg_match_all('/[,\(] *([^$][^ ]+) +(\$[^ ]+)[,\)]/', $methodArgs, $ma, PREG_SET_ORDER)) {
 							$methodDocBlock = "\t\t/**\n";
 							foreach ($ma as $m) {
@@ -152,18 +153,22 @@
  */
 class " . $className . "Test extends Tx_Phpunit_TestCase {
 ";
-			if ($hasNonStaticMethod) {
 				$out2 .= '
 	/**
 	 * @var Tx_Phpunit_Framework
 	 */
 	protected $framework;
+';
+            if ($hasNonStaticMethod) {
 
+                $out2 .= '
 	/**
 	 * @var ' . $classNameFQ . '
 	 */
 	protected $' . $classInstanceName . ';
-
+';
+            }
+                $out2 .= '
 	/**
 	 * @var TYPO3\CMS\Core\Database\DatabaseConnection
 	 */
@@ -177,12 +182,18 @@ class " . $className . "Test extends Tx_Phpunit_TestCase {
 		$this->framework = new Tx_Phpunit_Framework(\'\');
 		$this->framework->markTableAsDirty(\'sys_template\');
 		$this->framework->createFakeFrontEnd(1);
+';
+            if ($hasNonStaticMethod) {
 
+            $out2 .= '
 		$this->' . $classInstanceName . ' = new ' . $classNameFQ . '();
+';
+            }
+            $out2 .= '
 		$this->database = new \TYPO3\CMS\Core\Database\DatabaseConnection();
 	}
 				 ';
-			}
+
 
 			$out2 .= $out . "
 }
