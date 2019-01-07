@@ -18,7 +18,6 @@
 	 *
 	 */
 	function t3tool_handlecmd($args, $level = 0) {
-
 		// check if an alias matches
 		foreach ($args as $i => $value) {
 			$alias_key = implode(' ', array_slice($args, 0, $i));

@@ -25,7 +25,7 @@
     define('PATH_typo3conf', PATH_site . 'typo3conf/');
     define('PATH_t3lib', PATH_site . 't3lib/');
     define('PATH_t3tool', PATH_site . '../.t3tool/');
-    define('PATH_reports', '/var/www/documentation/http/reports/');
+    define('PATH_reports', '/var/www/virtual/bolius-lko/docs/.t3tool/reports/');
 
 	// set indentation string
 	define('INDENT', "\t");
