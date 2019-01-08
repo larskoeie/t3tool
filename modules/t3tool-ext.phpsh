@@ -363,6 +363,32 @@
 				$to = $to ? explode(',', $to) : NULL;
 
 
+				foreach ($EM_CONF as $extkey => &$config) {
+
+                    // check git
+                    $path = PATH_site . $config['added by t3tool']['path'] . $extkey;
+                    if (is_file($path . '/.git') || is_dir($path . '/.git')) {
+                        /**
+                         * Git log
+                         */
+                        $output = [];
+                        exec("cd " . PATH_site . 'typo3conf/ext/' . $extkey . "; if [ -d .git ]; then git log -1 --pretty=format:%h%n%ai%n%an; fi", $output);
+                        $config['added by t3tool']['git'] = [
+                            'repo' => [
+                                'name' => $extkey,
+                                'url' => 'https://github.com/Bolius/' . $extkey,
+                            ],
+                            'head' => [
+                                'sha' => $output[0],
+                                'time' => $output[1],
+                                'author' => $output[2],
+                                'url' => 'https://github.com/Bolius/' . $extkey . '/commit/' . $output[0],
+                            ],
+                        ];
+                    }
+
+
+				}
                 $mentionsStruct = [];
 
 				$reportHtml = '<link rel="stylesheet" type="text/css" href="report.css">';
@@ -450,7 +476,8 @@
 
 										foreach ($output as $file) {
 
-											$header_ext = "\n$_EXTKEY -> $dependee :";
+                                            $mentionsStruct[$_EXTKEY]['git'] = $EM_CONF[$_EXTKEY]['added by t3tool']['git'];
+                                            $header_ext = "\n$_EXTKEY -> $dependee :";
 
 											if ($header_ext != $_header_ext) {
 												$report .= $header_ext;
@@ -481,18 +508,9 @@
 												$reportHtml .= '<li>' . $linenum_padded . ' :<pre> ' . htmlentities($line) . '</pre></li>';
 												$fileextensions[$fileextension] = TRUE;
 
-                                                /**
-                                                 * Git blame
-                                                 */
-                                                $command = "cd $path; if [ -f .git ]; then git blame -L $linenum,$linenum $filepath; fi";
-                                                $output = array();
-                                                exec($command, $output);
-                                                if (trim($output[0])) {
-                                                    $report .= "\n      " . $output[0] . "\n";
-                                                    $mention['commit'] = array(
-                                                        'blame' => $output[0],
-                                                    );
-                                                }
+
+
+
 
 
 											}
@@ -508,6 +526,7 @@
 										if (sizeof($linenumbers)) {
 
 foreach ($linenumbers as $file => $linenums) {
+    $filepath = PATH_site . $path . '/' . $file;
     $codeLines = file(PATH_site . $path . '/' . $file);
 
     // run through all hunks, and add the search strings that each of them contain
@@ -524,8 +543,20 @@ foreach ($linenumbers as $file => $linenums) {
         }
         $hunk['strings'] = array_keys($strings);
         $hunk['roles'] = array_keys($roles);
-        print_r($hunk);
+        /**
+         * Git blame
+         */
+        $firstLine = $hunk['firstLine'];
+        $lastLine = $hunk['lastLine'];
+        $command = "cd " . PATH_site . $path . "; if [ -d .git ]; then git blame -L $firstLine,$lastLine $filepath; fi";
+        $output = array();
+        exec($command, $output);
+        if (sizeof($output)) {
+            $hunk['git-blame'] = $output;
+        }
         $mentionsStruct[$_EXTKEY][$dependee]['mentions'][$file][] = $hunk;
+
+
     }
 
 }
@@ -670,11 +701,17 @@ depender [shape=box,pos=\"3000,3000\"];\n dependee [shape=box];\n depender -> de
                     $dependerDot = "$dependerKey [shape=box]\n";
                     $dependeeDot = [];
 
-                    $extHtml[$dependerKey] = '<img src="data/' . md5('by-depender-' . $dependerKey) . '.png">';
+
+                    if (isset($dependees['git'])) {
+                        $extHtml[$dependerKey] .= sprintf('<div class="git-info">git : <a href="%s">%s</a></div>', $dependees['git']['head']['url'], $dependees['git']['head']['sha']);
+                    }
+                    $extHtml[$dependerKey] .= '<img src="data/' . md5('by-depender-' . $dependerKey) . '.png">';
 
 
                     foreach ($dependees as $dependeeKey => $dependee) {
-//                        $byDependeeHtml[$dependeeKey] = '<img src="data/' . md5('by-dependee-' . $dependeeKey) . '.png">';
+                        if ($dependeeKey == 'git') {
+                            continue;
+                        }
 
                         $hasDependency = isset($by_depender_wo_version[$dependerKey][$dependeeKey]);
                         $fileextensions = [];
@@ -693,6 +730,7 @@ depender [shape=box,pos=\"3000,3000\"];\n dependee [shape=box];\n depender -> de
                            $hunkHtml .= '<tr><td>' . implode($hunk['roles']) . '</td></tr>';
 
                                 foreach ($hunk['code'] as $lineNum => $codeLine) {
+                                    
                                     $codeLine = trim($codeLine, "\n");
                                     $codeLine = htmlentities($codeLine);
                                     $codeLine = str_replace(array("\t", " "), array("&nbsp;&nbsp;", "&nbsp;"), $codeLine);
@@ -700,10 +738,10 @@ depender [shape=box,pos=\"3000,3000\"];\n dependee [shape=box];\n depender -> de
                                     $tdClasses0 = ['blob-num'];
                                     $tdClasses1 = ['blob-code'];
                                     foreach ($hunk['strings'] as $string) {
-                                        if (preg_match(';\b' . $string . '\b;i', $codeLine)) {
+                                        if (preg_match(';' . $string . ';i', $codeLine)) {
                                             $tdClasses0[] = 'blob-num-addition';
                                             $tdClasses1[] = 'blob-code-addition';
-                                            $codeLine = preg_replace(';\b' . $string . '\b;i', '<span class="x">\\0</span>', $codeLine);
+                                            $codeLine = preg_replace(';' . $string . ';i', '<span class="x">\\0</span>', $codeLine);
                                         }
                                     }
                                     $hunkHtml .= sprintf("<tr><td class='%s'>%s</td>", implode(' ', $tdClasses0), $lineNum);
@@ -1111,7 +1149,7 @@ nodesep=0.6;
         return $html;
     }
 
-	function t3tool_convert_linenumbers_to_hunks (array $lineNumbers, array $codeLines){
+	function t3tool_convert_linenumbers_to_hunks ($lineNumbers, array $codeLines){
 
 	    ksort($lineNumbers);
         $lineNumbers = array_keys($lineNumbers);
