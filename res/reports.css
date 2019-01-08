@@ -1,0 +1,26 @@
+body {
+    font-family: Courier;
+}
+
+.expandable {
+    border: solid 1px #f0f0f0;
+    margin: 0.5em 0;     
+}
+
+.expandable .header {
+    background-color: #f0f0f0;
+    padding: 0.2em 0 0.2em 0.5em;
+}
+
+.expandable .content {
+    margin-left: 1em;
+}
+
+span.x {
+    padding: 0 1em;
+    background-color: yellow;
+}
+
+.git-info {
+    text-align: right;
+}
