@@ -55,7 +55,6 @@ function attachClickHandlers () {
 }
 
 function expand (expandable) {
-    console.log(expandable);
     var header = expandable.find('.header');
     var content = expandable.find('.content');
     var key = expandable.data('key');

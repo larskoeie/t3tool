@@ -372,7 +372,7 @@
                          * Git log
                          */
                         $output = [];
-                        exec("cd " . PATH_site . 'typo3conf/ext/' . $extkey . "; if [ -d .git ]; then git log -1 --pretty=format:%h%n%ai%n%an; fi", $output);
+                        exec("cd " . PATH_site . 'typo3conf/ext/' . $extkey . "; if [ -d .git ]; then git log -1 --pretty=format:%H%n%ai%n%an; fi", $output);
                         $config['added by t3tool']['git'] = [
                             'repo' => [
                                 'name' => $extkey,
@@ -380,6 +380,7 @@
                             ],
                             'head' => [
                                 'sha' => $output[0],
+                                'sha-abbr' => substr($output[0], 0, 7),
                                 'time' => $output[1],
                                 'author' => $output[2],
                                 'url' => 'https://github.com/Bolius/' . $extkey . '/commit/' . $output[0],
@@ -685,9 +686,11 @@ depender [shape=box,pos=\"3000,3000\"];\n dependee [shape=box];\n depender -> de
 
             case 'mentions-report' :
 
+                $reportPath = getOption('reportPath') ?: 'mentions/';
 
-                if (! is_dir(PATH_reports . 'mentions/data/')) {
-                    mkdir(PATH_reports . 'mentions/data/', 0777, TRUE);
+
+                if (! is_dir(PATH_reports . $reportPath . 'data/')) {
+                    mkdir(PATH_reports . $reportPath . 'data/', 0777, TRUE);
                 }
 
                 $json = file_get_contents(PATH_t3tool . 'mentions.json');
@@ -695,15 +698,23 @@ depender [shape=box,pos=\"3000,3000\"];\n dependee [shape=box];\n depender -> de
 
                 $extHtml = [];
                 $byDependeeHtml = [];
+                    $dependeeDot = [];
+                $fullDot = '';
+
+                output_cmd('Building report');
 
                 foreach ($mentions as $dependerKey => $dependees) {
 
+
                     $dependerDot = "$dependerKey [shape=box]\n";
-                    $dependeeDot = [];
 
 
                     if (isset($dependees['git'])) {
-                        $extHtml[$dependerKey] .= sprintf('<div class="git-info">git : <a href="%s">%s</a></div>', $dependees['git']['head']['url'], $dependees['git']['head']['sha']);
+                        $extHtml[$dependerKey] .= sprintf('<div class="git-info">git : <a href="%s/tree/%s">%s</a></div>',
+                            $dependees['git']['repo']['url'],
+                            $dependees['git']['head']['sha'],
+                            $dependees['git']['head']['sha']
+                        );
                     }
                     $extHtml[$dependerKey] .= '<img src="data/' . md5('by-depender-' . $dependerKey) . '.png">';
 
@@ -713,24 +724,38 @@ depender [shape=box,pos=\"3000,3000\"];\n dependee [shape=box];\n depender -> de
                             continue;
                         }
 
+                        if (! isset($byDependeeHtml[$dependeeKey])) {
+                            $byDependeeHtml[$dependeeKey] .= '<img src="data/' . md5('by-dependee-' . $dependeeKey) . '.png">';
+                        }
+
                         $hasDependency = isset($by_depender_wo_version[$dependerKey][$dependeeKey]);
+                        $hasReverseDependency = isset($by_depender_wo_version[$dependeeKey][$dependerKey]);
+                        $hasReverseMention = isset($mentions[$dependeeKey][$dependerKey]);
+
                         $fileextensions = [];
+                        $filesHtml = '';
                         foreach ($dependee['mentions'] as $file => $hunks) {
                             if (preg_match(';\.([^.]{2,4})$;', $file, $m)) {
                                 $fileextension = $m[1];
                                 $fileextensions[$fileextension] = TRUE;
                             }
                             $fileHtml = '';
+                            $fileHtml .= sprintf('<div class="git-info">git : <a href="%s/tree/%s/%s">%s</a></div>',
+                                $mentions[$dependerKey]['git']['repo']['url'],
+                                $mentions[$dependerKey]['git']['head']['sha'],
+                                $file,
+                                $mentions[$dependerKey]['git']['head']['sha']
+                            );
                                 $fileHtml .= '<table class="codelines diff-table">';
                             foreach ($hunks as $hunkNum => $hunk) {
                                 $hunkHtml = '';
 
 //                                $hunkHtml .= '<tr><td class=\'linenumber blob-num blob-num-expandable\'><svg aria-hidden="true" class="octicon octicon-unfold" height="16" version="1.1" viewBox="0 0 14 16" width="14"><path fill-rule="evenodd" d="M11.5 7.5L14 10c0 .55-.45 1-1 1H9v-1h3.5l-2-2h-7l-2 2H5v1H1c-.55 0-1-.45-1-1l2.5-2.5L0 5c0-.55.45-1 1-1h4v1H1.5l2 2h7l2-2H9V4h4c.55 0 1 .45 1 1l-2.5 2.5zM6 6h2V3h2L7 0 4 3h2v3zm2 3H6v3H4l3 3 3-3H8V9z"></path></svg></td>';
 //                                $hunkHtml .= sprintf("<td class='code blob-code blob-code-inner blob-code-hunk'>@@ +%d,%d @@ %s</td></tr>\n", $hunk['firstLine'], $hunk['lastLine'] - $hunk['firstLine'], $hunk['label']);
-                           $hunkHtml .= '<tr><td>' . implode($hunk['roles']) . '</td></tr>';
+                           $hunkHtml .= '<tr><td colspan="100%">' . implode($hunk['roles']) . '</td></tr>';
 
                                 foreach ($hunk['code'] as $lineNum => $codeLine) {
-                                    
+
                                     $codeLine = trim($codeLine, "\n");
                                     $codeLine = htmlentities($codeLine);
                                     $codeLine = str_replace(array("\t", " "), array("&nbsp;&nbsp;", "&nbsp;"), $codeLine);
@@ -744,23 +769,48 @@ depender [shape=box,pos=\"3000,3000\"];\n dependee [shape=box];\n depender -> de
                                             $codeLine = preg_replace(';' . $string . ';i', '<span class="x">\\0</span>', $codeLine);
                                         }
                                     }
-                                    $hunkHtml .= sprintf("<tr><td class='%s'>%s</td>", implode(' ', $tdClasses0), $lineNum);
+
+                                    $gitLineUrl = sprintf('%s/tree/%s/%s#L%d',
+                                        $mentions[$dependerKey]['git']['repo']['url'],
+                                        $mentions[$dependerKey]['git']['head']['sha'],
+                                        $file,
+                                        $lineNum,
+                                        $mentions[$dependerKey]['git']['head']['sha']
+
+                                    );
+
+                                    $hunkHtml .= sprintf("<tr><td class='%s'><a href='%s'>%s</a></td>", implode(' ', $tdClasses0), $gitLineUrl, $lineNum);
                                     $hunkHtml .= sprintf("<td class='%s'><span class='blob-code-inner'>%s</span></td>", implode(' ', $tdClasses1), $codeLine);
+//                                    $hunkHtml .= sprintf("<td class='%s'><span class='blob-code-inner'><a href='%s'>[git]</a></span></td>", '', $gitLineUrl);
                                     $hunkHtml .= '</tr>';
                                 }
 
                                 $hunkHtml .= '';
-//                                $fileHtml .= t3tool_report_write_report_part('mentions', $dependerKey . $dependeeKey . $file . $hunkNum, $hunkNum, $hunkHtml);
+//                                $fileHtml .= t3tool_report_write_report_part($reportPath, $dependerKey . $dependeeKey . $file . $hunkNum, $hunkNum, $hunkHtml);
                                 $fileHtml .= $hunkHtml;
                             }
                                 $fileHtml .= '</table>';
-                            $fileHeader = '<div class="file-header"><div class="file-info">' . $file . ' (' . sizeof($hunks) . ' mentions)</div></div>';
+                            $fileHeader = '<div class="file-header"><div class="file-info">' . $file . ' (' . sizeof($hunks) . ' times)</div></div>';
 
-                            $what = t3tool_report_write_report_part('mentions', $dependerKey . $dependeeKey . $file, $fileHeader, $fileHtml);
+                            $filesHtml .= t3tool_report_write_report_part($reportPath, $dependerKey . $dependeeKey . $file, $fileHeader, $fileHtml);
 
                         }
-                        $extHtml[$dependerKey] .= t3tool_report_write_report_part('mentions', $dependerKey . $dependeeKey, '-> ' . $dependeeKey . ' (' . sizeof($dependee['mentions']) . ' files)' . ($hasDependency ? '' : ' - not declared'), $what);
-                        $byDependeeHtml[$dependeeKey] .= t3tool_report_write_report_part('mentions', $dependerKey . $dependeeKey, $dependerKey . ' -> (' . sizeof($dependee['mentions']) . ' files)' . ($hasDependency ? '' : ' - not declared'), $what);
+
+                        $filesHtml = sprintf('<div class="git-info">git : <a href="%s/tree/%s">%s</a></div>',
+                            $mentions[$dependerKey]['git']['repo']['url'],
+                            $mentions[$dependerKey]['git']['head']['sha'],
+                            $mentions[$dependerKey]['git']['head']['sha']
+                        ) . $filesHtml;
+
+
+                        $class = '';
+                        if (! $hasDependency) {
+                            $class = 'status-warning';
+                        }
+                        $extHtml[$dependerKey] .= t3tool_report_write_report_part($reportPath, $dependerKey . $dependeeKey, '-> ' . $dependeeKey . ' (' . sizeof($dependee['mentions']) . ' files)' . ($hasDependency ? '' : ' - not declared'), $filesHtml, $class);
+
+
+                        $byDependeeHtml[$dependeeKey] .= t3tool_report_write_report_part($reportPath, $dependerKey . $dependeeKey, $dependerKey . ' -> (' . sizeof($dependee['mentions']) . ' files)' . ($hasDependency ? '' : ' - not declared'), $filesHtml);
 
                         // determine dot styles
                         $linestyle = 'dashed';
@@ -785,11 +835,14 @@ depender [shape=box,pos=\"3000,3000\"];\n dependee [shape=box];\n depender -> de
 
                         $dependerDot .= "  $dependeeKey [shape=box];\n";
                         $dependerDot .= "  $dependerKey -> $dependeeKey [label=\"$lineLabel\" style=\"$linestyle\"];\n";
-                        $dependeeDot[$dependeeKey] .= "  $dependeeKey [shape=box];\n";
+                        //$dependeeDot[$dependeeKey] .= "  $dependeeKey [shape=box];\n";
                         $dependeeDot[$dependeeKey] .= "  $dependerKey -> $dependeeKey [label=\"$lineLabel\" style=\"$linestyle\"];\n";
+                        $fullDot .= "  $dependeeKey [shape=box];\n";
+                        $fullDot .= "  $dependerKey -> $dependeeKey [label=\"$lineLabel\" style=\"$linestyle\"];\n";
 
                     }
 
+                output_cmd('Building graphs');
                     $dependerDot = 	$output = "digraph extension_mentions {
     rankdir=BT;
 				size =\"60,60\";
@@ -797,8 +850,8 @@ depender [shape=box,pos=\"3000,3000\"];\n dependee [shape=box];\n depender -> de
 			sep=\"+25,25\";
 overlap=scalexy;
 nodesep=0.6;" . $dependerDot . "\n}";
-                    $dotFilePath = PATH_reports . 'mentions/data/' . md5('by-depender-' . $dependerKey) . '.dot';
-                    $pngFilePath = PATH_reports . 'mentions/data/' . md5('by-depender-' . $dependerKey) . '.png';
+                    $dotFilePath = PATH_reports . $reportPath . 'data/' . md5('by-depender-' . $dependerKey) . '.dot';
+                    $pngFilePath = PATH_reports . $reportPath . 'data/' . md5('by-depender-' . $dependerKey) . '.png';
                     file_put_contents($dotFilePath, $dependerDot);
                     system('dot -Tpng ' . $dotFilePath. ' -o ' . $pngFilePath);
 
@@ -806,19 +859,34 @@ nodesep=0.6;" . $dependerDot . "\n}";
 
                 }
 
+                output_ok();
                 foreach ($dependeeDot as $dependeeKey => $dot) {
-                    $dependeeDot = "digraph extension_mentions {
+                    $dot = "digraph extension_mentions {
     rankdir=BT;
 				size =\"60,60\";
 				labelloc = \"t\";
 			sep=\"+25,25\";
 overlap=scalexy;
 nodesep=0.6;" . $dot . "\n}";
-                    $dotFilePath = PATH_reports . 'mentions/data/' . md5('by-dependee-' . $dependeeKey) . '.dot';
-                    $pngFilePath = PATH_reports . 'mentions/data/' . md5('by-dependee-' . $dependeeKey) . '.png';
-                    file_put_contents($dotFilePath, $dependeeDot);
+                    $dotFilePath = PATH_reports . $reportPath . 'data/' . md5('by-dependee-' . $dependeeKey) . '.dot';
+                    $pngFilePath = PATH_reports . $reportPath . 'data/' . md5('by-dependee-' . $dependeeKey) . '.png';
+                    file_put_contents($dotFilePath, $dot);
                     system('dot -Tpng ' . $dotFilePath. ' -o ' . $pngFilePath);
                 }
+
+                $fullDot = "digraph extension_mentions {
+    rankdir=BT;
+				size =\"200,200\";
+				labelloc = \"t\";
+			sep=\"+25,25\";
+overlap=scalexy;
+nodesep=0.6;" . $fullDot . "\n}";
+                $dotFilePath = PATH_reports . $reportPath . 'data/full.dot';
+                $pngFilePath = PATH_reports . $reportPath . 'data/full.png';
+                file_put_contents($dotFilePath, $fullDot);
+                system('dot -Tpng ' . $dotFilePath. ' -o ' . $pngFilePath);
+
+                output_ok();
 
                 $indexHtml = '
                 <script src="//code.jquery.com/jquery-3.3.1.min.js"></script>
@@ -827,15 +895,15 @@ nodesep=0.6;" . $dot . "\n}";
                 ';
                 $byDependerHtml = '';
                 foreach ($extHtml as $ext => $html) {
-                    $byDependerHtml .= t3tool_report_write_report_part('mentions', 'by-depender-' . $ext, $ext, $html);
+                    $byDependerHtml .= t3tool_report_write_report_part($reportPath, 'by-depender-' . $ext, $ext, $html);
                 }
                 foreach ($byDependeeHtml as $ext => $html) {
-                    $byDependeeHtml .= t3tool_report_write_report_part('mentions', 'by-dependee-' . $ext, $ext, $html);
+                    $byDependeeHtml .= t3tool_report_write_report_part($reportPath, 'by-dependee-' . $ext, $ext, $html);
                 }
 
-                    $indexHtml .= t3tool_report_write_report_part('mentions', 'by-depender', 'By depender', $byDependerHtml);
-                    $indexHtml .= t3tool_report_write_report_part('mentions', 'by-dependee', 'By dependee', $byDependeeHtml);
-                file_put_contents(PATH_reports . 'mentions/index.html', $indexHtml);
+                    $indexHtml .= t3tool_report_write_report_part($reportPath, 'by-depender', 'By depender', $byDependerHtml);
+                    $indexHtml .= t3tool_report_write_report_part($reportPath, 'by-dependee', 'By dependee', $byDependeeHtml);
+                file_put_contents(PATH_reports . $reportPath . 'index.html', $indexHtml);
 
                 break;
 
@@ -1135,17 +1203,17 @@ nodesep=0.6;
 
 	}
 
-	function t3tool_report_write_report_part($reportKey, $key, $title, $content) {
+	function t3tool_report_write_report_part($reportPath, $key, $title, $content, $classes='') {
 	    $key = md5($key);
         $keyAbbr = substr($key, 0, 7);
 
 	    $html = "
-            <div class='expandable key-$keyAbbr' data-key='$key' data-keyabbr='$keyAbbr'>
+            <div class='expandable key-$keyAbbr' data-key='$key' data-keyabbr='$keyAbbr' " . ($classes ? (' class="' . $classes . '"') : '') . ">
                 <div class='header'>$title</div>
                 <div class='content'></div>
             </div>";
 
-        file_put_contents(PATH_reports . $reportKey . '/data/' . $key . '.html', $content);
+        file_put_contents(PATH_reports . $reportPath . '/data/' . $key . '.html', $content);
         return $html;
     }
 
@@ -1181,25 +1249,49 @@ nodesep=0.6;
         return $hunks;
     }
 
-    function t3tool_code_get_string_role ($code, $string) {
+    function t3tool_code_get_string_role ($code, $string, $fileExtension = 'php') {
         $code = trim($code);
 
-        if (preg_match('/use .+' . $string . '/i', $code)) {
-            return 'Use statement';
-        }
+        switch ($fileExtension) {
 
-        if (preg_match('/extends [^ ]*' . $string . '/i', $code)) {
-            return 'Class inheritance statement';
-        }
 
-        if (preg_match('/\'[^\']*' . $string . '[^\']*\'/i', $code)) {
-            return 'String literal';
-        }
+            case 'php' :
 
-        if (preg_match('/"[^\"]*' . $string . '[^"]*"/i', $code)) {
-            return 'String literal';
-        }
+                if (preg_match('/use .+' . $string . '/i', $code)) {
+                    return 'Use statement';
+                }
 
+                if (preg_match('/extends [^ ]*' . $string . '/i', $code)) {
+                    return 'Class inheritance statement';
+                }
+                if (preg_match('/implements [^ ]*' . $string . '/i', $code)) {
+                    return 'Interface implementation statement';
+                }
+
+                if (preg_match('/\'[^\']*' . $string . '[^\']*\'/i', $code)
+                    ||
+                    preg_match('/"[^\"]*' . $string . '[^"]*"/i', $code)) {
+                    if (preg_match(';;', $code)) {
+                        return 'String literal';
+                    }
+                    return 'String literal';
+                }
+
+                if (preg_match(';[a-z0-9_\\\\]*' . $string . '[a-z0-9_\\\\]*((->)|(::));i', $code)) {
+                    return 'Class name';
+                }
+
+                break;
+            case 'html' :
+
+            case 'js' :
+
+            case 'ts' :
+            case 'typoscript' :
+
+                return $fileExtension;
+                
+        }
         return '?';
     }
 
