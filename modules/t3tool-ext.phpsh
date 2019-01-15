@@ -687,8 +687,8 @@ depender [shape=box,pos=\"3000,3000\"];\n dependee [shape=box];\n depender -> de
             case 'mentions-report' :
 
                 $reportPath = getOption('reportPath') ?: 'mentions/';
-
-
+                $reportPath = trim($reportPath, '/') . '/';
+                
                 if (! is_dir(PATH_reports . $reportPath . 'data/')) {
                     mkdir(PATH_reports . $reportPath . 'data/', 0777, TRUE);
                 }
