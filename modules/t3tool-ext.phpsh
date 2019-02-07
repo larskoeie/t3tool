@@ -364,6 +364,7 @@ function t3tool_ext_handlecmd($args)
             $to = $to ? explode(',', $to) : NULL;
 
 
+            output_cmd('Determining git statuses for all extensions');
             foreach ($EM_CONF as $extkey => &$config) {
 
                 // check git
@@ -400,6 +401,8 @@ function t3tool_ext_handlecmd($args)
 
 
             }
+            output_ok();
+
             $mentionsStruct = [
                 'grepTimestamp' => time(),
                 'grepDatetime' => date(DATE_W3C, time()),
@@ -581,6 +584,8 @@ function t3tool_ext_handlecmd($args)
             $reportPath = getOption('reportPath') ?: 'mentions/';
             $reportPath = trim($reportPath, '/') . '/';
 
+            output_info('Writing to ' . PATH_reports . $reportPath);
+
             if (!is_dir(PATH_reports . $reportPath . 'data/')) {
                 mkdir(PATH_reports . $reportPath . 'data/', 0777, TRUE);
             }
@@ -603,10 +608,11 @@ function t3tool_ext_handlecmd($args)
 
 
                 if (isset($depender['git'])) {
-                    $extHtml[$dependerKey] .= sprintf('<div class="git-info">git : <a href="%s/tree/%s">%s</a></div>',
+                    $extHtml[$dependerKey] .= sprintf('<div class="git-info">git : <a href="%s/tree/%s">%s</a> - %s</div>',
                         $depender['git']['repo']['url'],
                         $depender['git']['head']['sha'],
-                        $depender['git']['head']['sha-abbr']
+                        $depender['git']['head']['sha-abbr'],
+                        $depender['git']['status']
                     );
                 }
                 $extHtml[$dependerKey] .= '<img src="data/' . md5('by-depender-' . $dependerKey) . '.png">';
@@ -686,10 +692,11 @@ function t3tool_ext_handlecmd($args)
 
                     }
 
-                    $filesHtml = sprintf('<div class="git-info">git : <a href="%s/tree/%s">%s</a></div>',
+                    $filesHtml = sprintf('<div class="git-info">git : <a href="%s/tree/%s">%s</a> - %s</div>',
                             $mentions['extensions'][$dependerKey]['git']['repo']['url'],
                             $mentions['extensions'][$dependerKey]['git']['head']['sha'],
-                            $mentions['extensions'][$dependerKey]['git']['head']['sha-abbr']
+                            $mentions['extensions'][$dependerKey]['git']['head']['sha-abbr'],
+                            $mentions['extensions'][$dependerKey]['git']['status']
                         ) . $filesHtml;
 
 
