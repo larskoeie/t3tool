@@ -387,6 +387,15 @@ function t3tool_ext_handlecmd($args)
                             'url' => 'https://github.com/Bolius/' . $extkey . '/commit/' . $output[0],
                         ],
                     ];
+                    $output = [];
+                    exec("cd " . PATH_site . 'typo3conf/ext/' . $extkey . "; if [ -d .git ]; then git status; fi", $output);
+                    $config['added by t3tool']['git']['status'] = $output[0];
+                    if (preg_match('/On branch (.+)/', $output[0], $m)) {
+                        $config['added by t3tool']['git']['branch'] = [
+                            'name' => $m[1],
+                        ];
+                    }
+
                 }
 
 
