@@ -1,1046 +1,934 @@
 <?php
-	/**
-	 * t3tool-sqlq.phpsh
-	 *
-	 * Handles the commands "t3tool ext ...".
-	 *
-	 * Extensions can be filtered in a number of ways :
-	 * - type (local, global or system)
-	 *   default is local only
-	 *   --system adds system
-	 *   --only-system gives only system
-	 * - installed/not installed
-	 *   default is installed only
-	 *   --inactive adds inactive
-	 * -- include adds
-	 * - tracked/not tracked
-	 *
-	 * @package t3tool
-	 * @author Lars Køie
-	 *
-	 */
-
-	/**
-	 * @param $args
-	 */
-	function t3tool_ext_handlecmd($args) {
-		t3tool_read_conf();
-		$cmd = array_shift($args);
-		$ext = trim(strtolower($args[0]));
-
-
-		$filter = strtolower($args[0]);
-		$local = getOption('l');
-
-		$stripped_ext = str_replace('_', '', $ext);
-
-		output_cmd('Building list of extensions and dependencies');
-
-		if ($GLOBALS['version_4']) {
-			$exts = explode(',', $GLOBALS['TYPO3_CONF_VARS']['EXT']['extList']);
-		}
-		if ($GLOBALS['version_6']) {
-			$exts = $GLOBALS['TYPO3_CONF_VARS']['EXT']['extListArray'];
-		}
-		if (file_exists(PATH_typo3conf . 'PackageStates.php')) {
-			$exts = array();
-			$packageStates = include(PATH_typo3conf . 'PackageStates.php');
-			foreach ($packageStates['packages'] as $k => $v) {
-				if ($v['state'] == 'active') {
-					$exts[] = $k;
-				}
-			}
-		}
-		if (!$exts) {
-			$exts = array();
-		}
-		$EM_CONF = array();
-		// these are the installed extensions
-
-		$order = 0;
-		foreach ($exts as $_EXTKEY) {
-			if (is_file("typo3conf/ext/$_EXTKEY/ext_emconf.php")) {
-				include_once(PATH_typo3conf . "ext/$_EXTKEY/ext_emconf.php");
-				$EM_CONF[$_EXTKEY]['added by t3tool']['path'] = 'typo3conf/ext/';
-				$EM_CONF[$_EXTKEY]['added by t3tool']['type'] = 'Local';
-			}
-			if (is_file("typo3/ext/$_EXTKEY/ext_emconf.php")) {
-				include_once("typo3/ext/$_EXTKEY/ext_emconf.php");
-				$EM_CONF[$_EXTKEY]['added by t3tool']['path'] = 'typo3/ext/';
-				$EM_CONF[$_EXTKEY]['added by t3tool']['type'] = 'Global';
-			}
-			if (is_file("typo3/sysext/$_EXTKEY/ext_emconf.php")) {
-				include_once("typo3/sysext/$_EXTKEY/ext_emconf.php");
-				$EM_CONF[$_EXTKEY]['added by t3tool']['path'] = 'typo3/sysext/';
-				$EM_CONF[$_EXTKEY]['added by t3tool']['type'] = 'System';
-			}
-			$EM_CONF[$_EXTKEY]['added by t3tool']['installed'] = TRUE;
-			$EM_CONF[$_EXTKEY]['added by t3tool']['order'] = ($order++);
-		}
-
-		// now add the extensions that are not installed
-		foreach (array(
-					 'Local' => 'typo3conf/ext/',
-					 'Global' => 'typo3/ext/',
-					 'System' => 'typo3/sysext/'
-				 ) as $type => $path) {
-			if (!is_dir($path)) {
-				continue;
-			}
-			$dh = opendir($path);
-			while ($_EXTKEY = readdir($dh)) {
-				if (substr($_EXTKEY, 0, 1) == '.') {
-					continue;
-				}
-				if (!is_dir($path . $_EXTKEY)) {
-					continue;
-				}
-				if (isset($EM_CONF[$_EXTKEY])) {
-					continue;
-				}
-
-				if (is_file($path . "$_EXTKEY/ext_emconf.php")) {
-					include_once($path . "$_EXTKEY/ext_emconf.php");
-					$EM_CONF[$_EXTKEY]['added by t3tool']['type'] = $type;
-					$EM_CONF[$_EXTKEY]['added by t3tool']['path'] = $path;
-					$EM_CONF[$_EXTKEY]['added by t3tool']['installed'] = FALSE;
-				}
-			}
-		}
-
-
-		// build list of extensions to handle
-		$include = explode(',', getOption('include'));
-		$exclude = explode(',', getOption('exclude'));
-		$showOnlyExts = array();
-		foreach ($EM_CONF as $_EXTKEY => $config) {
-			$handle =
-				(getOption('all')
-					|| (
-						($config['added by t3tool']['type'] == 'Local')
-						|| (($config['added by t3tool']['type'] == 'System') && getOption('system'))
-						|| in_array($_EXTKEY, $include)
-					)
-					&& ($config['added by t3tool']['installed'] || getOption('inactive')))
-				&& !in_array($_EXTKEY, $exclude);
-
-			if ($handle) {
-				$showOnlyExts[] = $_EXTKEY;
-			}
-		}
-
-		t3tool_debug($showOnlyExts);
-		ksort($EM_CONF);
-
-
-		// populate dependencies
-		foreach ($EM_CONF as $_EXTKEY => $config) {
-			$depender_version = $EM_CONF[$_EXTKEY]['version'];
-
-			// post 6-0
-			if (isset($EM_CONF[$_EXTKEY]['constraints']['depends'])) {
-				$dependencies = $EM_CONF[$_EXTKEY]['constraints']['depends'];
-				foreach ($dependencies as $dependee => $version) {
-					$by_depender[$_EXTKEY . ' ' . $depender_version][$dependee] = $version;
-					$by_depender_wo_version[$_EXTKEY][$dependee] = TRUE;
-					$by_dependee[$dependee][$version][$_EXTKEY] = TRUE;
-				}
-			} else {
-				// pre-6.0
-				if (isset($EM_CONF[$_EXTKEY]['dependencies'])) {
-					$dependencies = $EM_CONF[$_EXTKEY]['dependencies'];
-					foreach (explode(',', $dependencies) as $dependee) {
-						$by_depender[$_EXTKEY . ' ' . $depender_version][$dependee] = TRUE;
-						$by_dependee[$dependee][$version][$_EXTKEY . '(' . $EM_CONF[$_EXTKEY]['version'] . ')'] = TRUE;
-					}
-				}
-			}
-		}
-
-		ksort($by_depender);
-		ksort($by_dependee);
-
-		output_ok();
-
-
-		switch ($cmd) {
-
-			/**
-			 *
-			 */
-			case 'update-doxygen' :
-				die;
-				if (!is_dir(PATH_t3tool . 'ext')) {
-					mkdir(PATH_t3tool . 'ext');
-				}
-				system('cd ' . PATH_t3tool . 'ext && rm -r *');
-				foreach ($showOnlyExts as $_EXTKEY) {
-					if ($EM_CONF[$_EXTKEY]['added by t3tool']['type'] == 'Local') {
-						system('cd ' . PATH_t3tool . 'ext/; ln -s ' . PATH_site . $EM_CONF[$_EXTKEY]['added by t3tool']['path'] . $_EXTKEY);
-					}
-				}
-				system('cd ' . PATH_t3tool . 'ext/; ln -s ' . PATH_site . 'typo3');
-				break;
-
-			case 'analyze' :
-
-				if (! $ext) {
-
-				}
-
-				break;
-
-			case 'health-check':
-				// search for double class overridings
-				$conflicts = 0;
-
-				foreach ($showOnlyExts as $i => $extkey) {
-					$config = $EM_CONF[$extkey];
-
-					$command = "cd " . PATH_site . $config['added by t3tool']['path'] . $extkey . '; ';
-					$command .= 'grep -rni --include=ext_tables.php --include=ext_localconf.php "SYS.*Objects" .';
-					$output = NULL;
-
-					exec($command, $output);
-					if (sizeof($output)) {
-
-						$out .= "\n" .  $extkey . " overrides :\n"  ;
-
-						foreach ($output as $occurence) {
-							if (preg_match(';SYS.*Objects.\]\[.([^ \]]+).\];', $occurence, $m)) {
-								$class = trim($m[1], '\[\]\'"');
-								$class = str_replace('\\\\', '\\', $class);
-								if (isset($classes[$class])) {
-									$out .= INDENT . "[CONFLICT] $class\n";
-									$conflicts ++;
-								} else {
-									$out .= INDENT . "$class \n";
-									$classes[$class] = 1;
-								}
-
-							}
-
-						}
-					}
-
-				}
-				$out .= "$conflicts conflict(s)\n\n ";
-
-				foreach ($showOnlyExts as $i => $extkey) {
-					$config = $EM_CONF[$extkey];
-
-					$command = "cd " . PATH_site . $config['added by t3tool']['path'] . $extkey . '; ';
-					$command .= 'grep -rni --include=ext_tables.php --include=ext_localconf.php "TYPO3_CONF_VARS.*SC_OPTIONS" .';
-					$output = NULL;
-
-					exec($command, $output);
-					if (sizeof($output)) {
-
-						foreach ($output as $occurence) {
-							if (preg_match(';TYPO3_CONF_VARS.*SC_OPTIONS.\]\[.([^ \]]+).\]\[.([^ \]]+).\];', $occurence, $m)) {
-
-								$id = $m[1] . ':' . $m[2];
-
-								$bySubscriber[$extkey][$id] = TRUE;
-								$byBroadcaster[$id][$extkey] = TRUE;
-
-							}
-
-						}
-					}
-
-					$out .= print_R($byBroadcaster, TRUE);
-
-
-				}
-
-
-					return $out;
-				break;
-
-			//
-			// List of installed extensions
-			//
-			case 'list' :
-				foreach ($showOnlyExts as $i => $extkey) {
-					$config = $EM_CONF[$extkey];
-					if (!$ext || preg_match("/$ext/", $extkey) || preg_match("/$ext/", $config['title'])) {
-						$extdata = array(
-							'order' => $config['added by t3tool']['order'],
-							'key' => $extkey,
-							'version' => $config['version'],
-							'type' => $config['added by t3tool']['type'],
-							'installed' => $config['added by t3tool']['installed'],
-						);
-
-						if (getOption('ter')) {
-
-							if ($extdata['type'] != 'Local' || isInTer($extKey)) {
-								$secureVersion = getSecureVersion($extKey, $info['version']);
-								$latestVersion = getLatestVersion($extKey, $info['version']);
-
-								$extdata['latest'] = $latestVersion;
-
-								$extdataUpdate = $latestVersion != $info['version'];
-								$extdataSecurity = $secureVersion != $info['version'];
-
-
-								if ($extdataUpdate) {
-									$extdata['status'] = 'Update';
-								}
-								if ($extdataSecurity) {
-									$extdata['status'] = 'SECURITY update';
-								}
-							} else {
-								$extdata['status'] = 'Not in TER';
-
-							}
-						}
-
-						$siteUpdate |= $extdataUpdate;
-						$siteSecurity |= $extdataSecurity;
-
-						if (getOption('git')) {
-							// check git
-							$path = PATH_site . $config['added by t3tool']['path'] . $extkey;
-							if (is_file($path . '/.git') || is_dir($path . '/.git')) {
-								$output = array();
-								exec("cd $path; git log -1 --pretty=format:%h%n%ar%n%an", $output);
-								$extdata['commit'] = $output[0];
-								if (getOption('git') === 'full') {
-									$extdata['time'] = $output[1];
-									$extdata['author'] = $output[2];
-								}
-							}
-
-						}
-
-						$extlist[] = $extdata;
-					}
-				}
-				if (sizeof($extlist)) {
-					return "Installed extensions:\n" . sendAsFlatTable($extlist);
-				} else {
-					return "No installed extensions\n";
-				}
-				break;
-
-            /**
-             * List of extension keys - nothing else.
-             * Alphabetical order.
-             * Useful for making a diff between two sites.
-             */
-            case 'key-list' :
-
-                foreach ($showOnlyExts as $i => $extkey) {
-                    $config = $EM_CONF[$extkey];
-                    if (!$ext || preg_match("/$ext/", $extkey) || preg_match("/$ext/", $config['title'])) {
-                        $extdata = array(
-                            'key' => $extkey,
-                        );
-
-                        $extlist[$extkey] = $extdata;
-                    }
-                }
-
-                if (sizeof($extlist)) {
-                    ksort($extlist);
-                    $extlist = array_values($extlist);
-                    return "Installed extensions:\n" . sendAsFlatTable($extlist);
-                } else {
-                    return "No installed extensions\n";
-                }
-
-                break;
-
-			case 'mentions' :
-
-				$extkeys = array();
-
-				$from = trim(strtolower($args[0]));
-				$from = $from ? explode(',', $from) : NULL;
-				$to = trim(strtolower($args[1]));
-				$to = $to ? explode(',', $to) : NULL;
-
-
-				foreach ($EM_CONF as $extkey => &$config) {
-
-                    // check git
-                    $path = PATH_site . $config['added by t3tool']['path'] . $extkey;
-                    if (is_file($path . '/.git') || is_dir($path . '/.git')) {
-                        /**
-                         * Git log
-                         */
-                        $output = [];
-                        exec("cd " . PATH_site . 'typo3conf/ext/' . $extkey . "; if [ -d .git ]; then git log -1 --pretty=format:%H%n%ai%n%an; fi", $output);
-                        $config['added by t3tool']['git'] = [
-                            'repo' => [
-                                'name' => $extkey,
-                                'url' => 'https://github.com/Bolius/' . $extkey,
-                            ],
-                            'head' => [
-                                'sha' => $output[0],
-                                'sha-abbr' => substr($output[0], 0, 7),
-                                'time' => $output[1],
-                                'author' => $output[2],
-                                'url' => 'https://github.com/Bolius/' . $extkey . '/commit/' . $output[0],
-                            ],
-                        ];
-                    }
-
-
-				}
-                $mentionsStruct = [];
-
-				$reportHtml = '<link rel="stylesheet" type="text/css" href="report.css">';
-
-				// make list of strings to search for
-				foreach ($EM_CONF as $_EXTKEY => $config) {
-					if ($EM_CONF[$_EXTKEY]['added by t3tool']['installed'] &&
-						$EM_CONF[$_EXTKEY]['added by t3tool']['type'] == 'Local' &&
-						!in_array($_EXTKEY, $exclude)
-					) {
-						$prefixes[$_EXTKEY][] = $_EXTKEY;
-						$prefixes[$_EXTKEY][] = str_replace('_', '', $_EXTKEY);
-						$prefixes[$_EXTKEY][] = 'tx_' . str_replace('_', '', $_EXTKEY);
-					}
-
-				}
-
-				// do search
-				foreach ($EM_CONF as $_EXTKEY => $config) {
-					if ($EM_CONF[$_EXTKEY]['added by t3tool']['installed'] &&
-						$EM_CONF[$_EXTKEY]['added by t3tool']['type'] == 'Local' &&
-						!in_array($_EXTKEY, $exclude)
-
-					) {
-
-						$reportHtml .= '<h1>' . $_EXTKEY . '</h1>';
-
-						$path = $EM_CONF[$_EXTKEY]['added by t3tool']['path'] . $_EXTKEY;
-						foreach ($prefixes as $dependee => $temp) {
-							// if either is excluded, do not search
-							if (in_array($_EXTKEY, $exclude) || in_array($dependee, $exclude)) {
-								continue;
-							}
-							// if arg-0 is set and neither is in arg-0, do not search
-							if ($from) {
-								if ($to) {
-									if (!in_array_wildcard($_EXTKEY, $from) || !in_array_wildcard($dependee, $to)) {
-										continue;
-									}
-								} else {
-									if (!in_array_wildcard($_EXTKEY, $from) && !in_array_wildcard($dependee, $from)) {
-										continue;
-									}
-								}
-							}
-
-
-                            if ($dependee != $_EXTKEY) {
-								if ($_EXTKEY != $__EXTKEY) {
-									output_cmd('Searching ' . $_EXTKEY);
-									output_progress_start();
-								}
-                                $linenumbers = [];
-                                $fileHunks = [];
-
-								$dependencyExists = isset($by_depender_wo_version[$_EXTKEY][$dependee]);
-
-								foreach ($temp as $prefix) {
-								    //echo "$prefix ,";
-									$command = "cd $path; ";
-									/**
-									 * Search recursively all of extension dir, but exclude
-									 * - ext_emconf.php, as it contains dependencies, not mentions
-									 * - composer.json, same reason
-									 * - .git/ as it contains old, possibly removed, code
-									 *
-									 * If file extensions to include is specified, use them.
-									 *
-									 */
-									$command .= 'grep -rni --exclude="composer.json" --exclude="ext_emconf.php" --exclude-dir=".git"';
-									if (getOption('include-files')) {
-										$command .= ' --include="' . getOption('include-files') . '"';
-									}
-									$command .= ' "' . $prefix . '" .';
-									$output = NULL;
-									exec($command, $output);
-									if (sizeof($output)) {
-
-										$mentions_exts[$_EXTKEY] = 1;
-										$mentions_exts[$dependee] = 1;
-
-										// determine file extensions
-										$fileextensions = array();
-										$reportHtml .= '<ul>';
-
-										foreach ($output as $file) {
-
-                                            $mentionsStruct[$_EXTKEY]['git'] = $EM_CONF[$_EXTKEY]['added by t3tool']['git'];
-                                            $header_ext = "\n$_EXTKEY -> $dependee :";
-
-											if ($header_ext != $_header_ext) {
-												$report .= $header_ext;
-												$reportHtml  .= '<h2>' . $header_ext . '</h2>';
-												$_header_ext = $header_ext;
-											}
-											if (preg_match(';^\./(.+\.([a-z0-9]{1,4})):([0-9]+):(.+)$;', $file, $m)) {
-												$filepath = $m[1];
-												$fileextension = $m[2];
-												$linenum = $m[3];
-												$linenum_padded = str_pad($linenum, 4, ' ', STR_PAD_LEFT);
-												$line = trim($m[4], " \t");
-
-                                                $linenumbers[$filepath][$linenum] = 1;
-
-												if ($filepath != $_filepath) {
-                                                    $mention = array(
-	            								        'file' => $filepath,
-	            								        'extension' => $fileextension,
-	            								        'linenum' =>  $linenum,
-	            								        'code' => $line,
-                                                    );
-													$report .= "\n  $filepath";
-													$reportHtml .= '<h3>' . $filepath . "</h3>\n";
-													$_filepath = $filepath;
-												}
-												$report .= "\n    $linenum_padded: " . t3tool_chunk_and_indent($line, 5);
-												$reportHtml .= '<li>' . $linenum_padded . ' :<pre> ' . htmlentities($line) . '</pre></li>';
-												$fileextensions[$fileextension] = TRUE;
-
-
-
-
-
-
-											}
-										}
-										$reportHtml .= '</ul>';
-
-										$mentions[$_EXTKEY][$dependee] = implode(',', array_keys($fileextensions)) . ' (' . sizeof($output) . ')';
-
-
-									}
-									echo ".";
-								}
-										if (sizeof($linenumbers)) {
-
-foreach ($linenumbers as $file => $linenums) {
-    $filepath = PATH_site . $path . '/' . $file;
-    $codeLines = file(PATH_site . $path . '/' . $file);
-
-    // run through all hunks, and add the search strings that each of them contain
-    foreach (t3tool_convert_linenumbers_to_hunks($linenums, $codeLines) as $hunk) {
-        $strings = [];
-        $roles = [];
-        foreach ($hunk['code'] as $codeLine) {
-            foreach ($temp as $prefix) {
-                if (preg_match(';' . $prefix . ';i', $codeLine)) {
-                    $strings[$prefix] = TRUE;
-                    $roles[t3tool_code_get_string_role($codeLine, $prefix)] = TRUE;
+/**
+ * t3tool-sqlq.phpsh
+ *
+ * Handles the commands "t3tool ext ...".
+ *
+ * Extensions can be filtered in a number of ways :
+ * - type (local, global or system)
+ *   default is local only
+ *   --system adds system
+ *   --only-system gives only system
+ * - installed/not installed
+ *   default is installed only
+ *   --inactive adds inactive
+ * -- include adds
+ * - tracked/not tracked
+ *
+ * @package t3tool
+ * @author Lars Køie
+ *
+ */
+
+/**
+ * @param $args
+ */
+function t3tool_ext_handlecmd($args)
+{
+    t3tool_read_conf();
+    $cmd = array_shift($args);
+    $ext = trim(strtolower($args[0]));
+
+
+    $filter = strtolower($args[0]);
+    $local = getOption('l');
+
+    $stripped_ext = str_replace('_', '', $ext);
+
+    output_cmd('Building list of extensions and dependencies');
+
+    if ($GLOBALS['version_4']) {
+        $exts = explode(',', $GLOBALS['TYPO3_CONF_VARS']['EXT']['extList']);
+    }
+    if ($GLOBALS['version_6']) {
+        $exts = $GLOBALS['TYPO3_CONF_VARS']['EXT']['extListArray'];
+    }
+    if (file_exists(PATH_typo3conf . 'PackageStates.php')) {
+        $exts = array();
+        $packageStates = include(PATH_typo3conf . 'PackageStates.php');
+        foreach ($packageStates['packages'] as $k => $v) {
+            if ($v['state'] == 'active') {
+                $exts[] = $k;
+            }
+        }
+    }
+    if (!$exts) {
+        $exts = array();
+    }
+    $EM_CONF = array();
+    // these are the installed extensions
+
+    $order = 0;
+    foreach ($exts as $_EXTKEY) {
+        if (is_file("typo3conf/ext/$_EXTKEY/ext_emconf.php")) {
+            include_once(PATH_typo3conf . "ext/$_EXTKEY/ext_emconf.php");
+            $EM_CONF[$_EXTKEY]['added by t3tool']['path'] = 'typo3conf/ext/';
+            $EM_CONF[$_EXTKEY]['added by t3tool']['type'] = 'Local';
+        }
+        if (is_file("typo3/ext/$_EXTKEY/ext_emconf.php")) {
+            include_once("typo3/ext/$_EXTKEY/ext_emconf.php");
+            $EM_CONF[$_EXTKEY]['added by t3tool']['path'] = 'typo3/ext/';
+            $EM_CONF[$_EXTKEY]['added by t3tool']['type'] = 'Global';
+        }
+        if (is_file("typo3/sysext/$_EXTKEY/ext_emconf.php")) {
+            include_once("typo3/sysext/$_EXTKEY/ext_emconf.php");
+            $EM_CONF[$_EXTKEY]['added by t3tool']['path'] = 'typo3/sysext/';
+            $EM_CONF[$_EXTKEY]['added by t3tool']['type'] = 'System';
+        }
+        $EM_CONF[$_EXTKEY]['added by t3tool']['installed'] = TRUE;
+        $EM_CONF[$_EXTKEY]['added by t3tool']['order'] = ($order++);
+    }
+
+    // now add the extensions that are not installed
+    foreach (array(
+                 'Local' => 'typo3conf/ext/',
+                 'Global' => 'typo3/ext/',
+                 'System' => 'typo3/sysext/'
+             ) as $type => $path) {
+        if (!is_dir($path)) {
+            continue;
+        }
+        $dh = opendir($path);
+        while ($_EXTKEY = readdir($dh)) {
+            if (substr($_EXTKEY, 0, 1) == '.') {
+                continue;
+            }
+            if (!is_dir($path . $_EXTKEY)) {
+                continue;
+            }
+            if (isset($EM_CONF[$_EXTKEY])) {
+                continue;
+            }
+
+            if (is_file($path . "$_EXTKEY/ext_emconf.php")) {
+                include_once($path . "$_EXTKEY/ext_emconf.php");
+                $EM_CONF[$_EXTKEY]['added by t3tool']['type'] = $type;
+                $EM_CONF[$_EXTKEY]['added by t3tool']['path'] = $path;
+                $EM_CONF[$_EXTKEY]['added by t3tool']['installed'] = FALSE;
+            }
+        }
+    }
+
+
+    // build list of extensions to handle
+    $include = explode(',', getOption('include'));
+    $exclude = explode(',', getOption('exclude'));
+    $showOnlyExts = array();
+    foreach ($EM_CONF as $_EXTKEY => $config) {
+        $handle =
+            (getOption('all')
+                || (
+                    ($config['added by t3tool']['type'] == 'Local')
+                    || (($config['added by t3tool']['type'] == 'System') && getOption('system'))
+                    || in_array($_EXTKEY, $include)
+                )
+                && ($config['added by t3tool']['installed'] || getOption('inactive')))
+            && !in_array($_EXTKEY, $exclude);
+
+        if ($handle) {
+            $showOnlyExts[] = $_EXTKEY;
+        }
+    }
+
+    t3tool_debug($showOnlyExts);
+    ksort($EM_CONF);
+
+
+    // populate dependencies
+    foreach ($EM_CONF as $_EXTKEY => $config) {
+        $depender_version = $EM_CONF[$_EXTKEY]['version'];
+
+        // post 6-0
+        if (isset($EM_CONF[$_EXTKEY]['constraints']['depends'])) {
+            $dependencies = $EM_CONF[$_EXTKEY]['constraints']['depends'];
+            foreach ($dependencies as $dependee => $version) {
+                $by_depender[$_EXTKEY . ' ' . $depender_version][$dependee] = $version;
+                $by_depender_wo_version[$_EXTKEY][$dependee] = TRUE;
+                $by_dependee[$dependee][$version][$_EXTKEY] = TRUE;
+            }
+        } else {
+            // pre-6.0
+            if (isset($EM_CONF[$_EXTKEY]['dependencies'])) {
+                $dependencies = $EM_CONF[$_EXTKEY]['dependencies'];
+                foreach (explode(',', $dependencies) as $dependee) {
+                    $by_depender[$_EXTKEY . ' ' . $depender_version][$dependee] = TRUE;
+                    $by_dependee[$dependee][$version][$_EXTKEY . '(' . $EM_CONF[$_EXTKEY]['version'] . ')'] = TRUE;
                 }
             }
         }
-        $hunk['strings'] = array_keys($strings);
-        $hunk['roles'] = array_keys($roles);
-        /**
-         * Git blame
-         */
-        $firstLine = $hunk['firstLine'];
-        $lastLine = $hunk['lastLine'];
-        $command = "cd " . PATH_site . $path . "; if [ -d .git ]; then git blame -L $firstLine,$lastLine $filepath; fi";
-        $output = array();
-        exec($command, $output);
-        if (sizeof($output)) {
-            $hunk['git-blame'] = $output;
-        }
-        $mentionsStruct[$_EXTKEY][$dependee]['mentions'][$file][] = $hunk;
-
-
     }
 
-}
-										}
-								if ($_EXTKEY != $__EXTKEY) {
-									output_ok();
-									$__EXTKEY = $_EXTKEY;
-								}
+    ksort($by_depender);
+    ksort($by_dependee);
 
-							}
-
-						}
-						$reportHtml .= '<img src="mentions-' . $_EXTKEY . '.png">';
-					}
-
-				}
-
-				file_put_contents(PATH_t3tool . 'mentions.json', json_encode($mentionsStruct, JSON_PRETTY_PRINT));
-
-				if (TRUE) {
-					echo $report;
-				}
-
-				if (!$mentions_exts) {
-					return;
-				}
-
-				// now build dot files
-					$graphLabel = 'Extension mentions';
-
-					$output = "digraph extension_mentions {
-
-				size =\"60,60\";
-				label = \"$graphLabel\"
-				labelloc = \"t\";
-			sep=\"+25,25\";
-overlap=scalexy;
-nodesep=0.6;
-";
+    output_ok();
 
 
-					foreach (array_keys($mentions_exts) as $ext) {
-						$dot[$ext] =  "digraph extension_mentions {
+    switch ($cmd) {
 
-				size =\"60,60\";
-				label = \"$graphLabel\"
-				labelloc = \"t\";
-			sep=\"+25,25\";
-overlap=scalexy;
-nodesep=0.6;
-rankdir = BT;
-";
-						if ($EM_CONF[$ext]['added by t3tool']['type'] == 'Local') {
-							$output .= "  $ext [shape=box];\n";
-						} else {
-							$output .= "  $ext [shape=box];\n";
-						}
-					}
+        /**
+         *
+         */
+        case 'update-doxygen' :
+            die;
+            if (!is_dir(PATH_t3tool . 'ext')) {
+                mkdir(PATH_t3tool . 'ext');
+            }
+            system('cd ' . PATH_t3tool . 'ext && rm -r *');
+            foreach ($showOnlyExts as $_EXTKEY) {
+                if ($EM_CONF[$_EXTKEY]['added by t3tool']['type'] == 'Local') {
+                    system('cd ' . PATH_t3tool . 'ext/; ln -s ' . PATH_site . $EM_CONF[$_EXTKEY]['added by t3tool']['path'] . $_EXTKEY);
+                }
+            }
+            system('cd ' . PATH_t3tool . 'ext/; ln -s ' . PATH_site . 'typo3');
+            break;
 
-					foreach ($mentions as $depender => $dependees) {
+        case 'analyze' :
 
-						foreach ($dependees as $dependee => $info) {
-							// determine styles
-							$linestyle = 'dashed';
-							$arrow = '->';
-							$arrowstyle = 'normal';
+            if (!$ext) {
 
-							// we have a declared dependency - all is fine ...
-							if (isset($by_depender_wo_version[$depender][$dependee])) {
-								$linestyle = 'solid';
+            }
 
-								// ... except if it goes both ways !
-								if (isset($mentions[$dependee][$depender])) {
-//									$linestyle = 'bold';
-								}
-							}
+            break;
 
-							// if it goes both ways !
-							if (isset($mentions[$dependee][$depender])) {
-//								$linestyle = 'bold';
-							}
+        case 'health-check':
+            // search for double class overridings
+            $conflicts = 0;
 
-							$dotLine = "  $depender $arrow $dependee [label=\"$info\" style=\"$linestyle\"];\n";
+            foreach ($showOnlyExts as $i => $extkey) {
+                $config = $EM_CONF[$extkey];
 
-							$output .= $dotLine;
-							$dot[$depender] .= $dotLine;
-							$dot[$dependee] .= $dotLine;
-						}
-					}
-					$output .= "      subgraph cluster_legend {
-depender [shape=box,pos=\"3000,3000\"];\n dependee [shape=box];\n depender -> dependee [label=\"filetypes (mentions count)\" style=\"solid\"];\n";
-					$output .= "  mentioner [shape=box];\n mentioned [shape=box];\n mentioner -> mentioned [label=\"filetypes (mentions count)\" style=\"dashed\"];\n";
-					$output .= "}";
+                $command = "cd " . PATH_site . $config['added by t3tool']['path'] . $extkey . '; ';
+                $command .= 'grep -rni --include=ext_tables.php --include=ext_localconf.php "SYS.*Objects" .';
+                $output = NULL;
 
+                exec($command, $output);
+                if (sizeof($output)) {
 
-					$output .= "}
-				";
+                    $out .= "\n" . $extkey . " overrides :\n";
 
-				if (!is_dir(PATH_t3tool . 'dot')) {
-					mkdir(PATH_t3tool . 'dot', 0777, TRUE);
-				}
+                    foreach ($output as $occurence) {
+                        if (preg_match(';SYS.*Objects.\]\[.([^ \]]+).\];', $occurence, $m)) {
+                            $class = trim($m[1], '\[\]\'"');
+                            $class = str_replace('\\\\', '\\', $class);
+                            if (isset($classes[$class])) {
+                                $out .= INDENT . "[CONFLICT] $class\n";
+                                $conflicts++;
+                            } else {
+                                $out .= INDENT . "$class \n";
+                                $classes[$class] = 1;
+                            }
 
-				foreach ($dot as $e => &$y) {
-						$y .= "}";
-						file_put_contents(PATH_t3tool . 'dot/mentions-' . $e, $y);
-					}
+                        }
 
-					$outputFile = getOption('output');
-					if ($outputFile) {
-						file_put_contents($outputFile, $output);
-					} else {
-						echo $output;
-					}
-
-
-
-				if (!is_dir(PATH_reports)) {
-					mkdir(PATH_reports, 0777, TRUE);
-				}
-				file_put_contents(PATH_reports . 'full_mentions.html', $reportHtml);
-
-				foreach ($dot as $e => $y) {
-//					system('dot -Tpng ' . PATH_t3tool . 'dot/mentions-' . $e . ' -o ' . PATH_reports . 'mentions-' . $e . '.png');
-				}
-				break;
-
-            case 'mentions-report' :
-
-                $reportPath = getOption('reportPath') ?: 'mentions/';
-                $reportPath = trim($reportPath, '/') . '/';
-                
-                if (! is_dir(PATH_reports . $reportPath . 'data/')) {
-                    mkdir(PATH_reports . $reportPath . 'data/', 0777, TRUE);
+                    }
                 }
 
-                $json = file_get_contents(PATH_t3tool . 'mentions.json');
-                $mentions = json_decode($json, JSON_OBJECT_AS_ARRAY);
+            }
+            $out .= "$conflicts conflict(s)\n\n ";
 
-                $extHtml = [];
-                $byDependeeHtml = [];
-                    $dependeeDot = [];
-                $fullDot = '';
+            foreach ($showOnlyExts as $i => $extkey) {
+                $config = $EM_CONF[$extkey];
 
-                output_cmd('Building report');
+                $command = "cd " . PATH_site . $config['added by t3tool']['path'] . $extkey . '; ';
+                $command .= 'grep -rni --include=ext_tables.php --include=ext_localconf.php "TYPO3_CONF_VARS.*SC_OPTIONS" .';
+                $output = NULL;
 
-                foreach ($mentions as $dependerKey => $dependees) {
+                exec($command, $output);
+                if (sizeof($output)) {
 
+                    foreach ($output as $occurence) {
+                        if (preg_match(';TYPO3_CONF_VARS.*SC_OPTIONS.\]\[.([^ \]]+).\]\[.([^ \]]+).\];', $occurence, $m)) {
 
-                    $dependerDot = "$dependerKey [shape=box]\n";
+                            $id = $m[1] . ':' . $m[2];
 
+                            $bySubscriber[$extkey][$id] = TRUE;
+                            $byBroadcaster[$id][$extkey] = TRUE;
 
-                    if (isset($dependees['git'])) {
-                        $extHtml[$dependerKey] .= sprintf('<div class="git-info">git : <a href="%s/tree/%s">%s</a></div>',
-                            $dependees['git']['repo']['url'],
-                            $dependees['git']['head']['sha'],
-                            $dependees['git']['head']['sha']
-                        );
+                        }
+
                     }
-                    $extHtml[$dependerKey] .= '<img src="data/' . md5('by-depender-' . $dependerKey) . '.png">';
+                }
+
+                $out .= print_R($byBroadcaster, TRUE);
 
 
-                    foreach ($dependees as $dependeeKey => $dependee) {
-                        if ($dependeeKey == 'git') {
+            }
+
+
+            return $out;
+            break;
+
+        //
+        // List of installed extensions
+        //
+        case 'list' :
+            foreach ($showOnlyExts as $i => $extkey) {
+                $config = $EM_CONF[$extkey];
+                if (!$ext || preg_match("/$ext/", $extkey) || preg_match("/$ext/", $config['title'])) {
+                    $extdata = array(
+                        'order' => $config['added by t3tool']['order'],
+                        'key' => $extkey,
+                        'version' => $config['version'],
+                        'type' => $config['added by t3tool']['type'],
+                        'installed' => $config['added by t3tool']['installed'],
+                    );
+
+                    if (getOption('ter')) {
+
+                        if ($extdata['type'] != 'Local' || isInTer($extKey)) {
+                            $secureVersion = getSecureVersion($extKey, $info['version']);
+                            $latestVersion = getLatestVersion($extKey, $info['version']);
+
+                            $extdata['latest'] = $latestVersion;
+
+                            $extdataUpdate = $latestVersion != $info['version'];
+                            $extdataSecurity = $secureVersion != $info['version'];
+
+
+                            if ($extdataUpdate) {
+                                $extdata['status'] = 'Update';
+                            }
+                            if ($extdataSecurity) {
+                                $extdata['status'] = 'SECURITY update';
+                            }
+                        } else {
+                            $extdata['status'] = 'Not in TER';
+
+                        }
+                    }
+
+                    $siteUpdate |= $extdataUpdate;
+                    $siteSecurity |= $extdataSecurity;
+
+                    if (getOption('git')) {
+                        // check git
+                        $path = PATH_site . $config['added by t3tool']['path'] . $extkey;
+                        if (is_file($path . '/.git') || is_dir($path . '/.git')) {
+                            $output = array();
+                            exec("cd $path; git log -1 --pretty=format:%h%n%ar%n%an", $output);
+                            $extdata['commit'] = $output[0];
+                            if (getOption('git') === 'full') {
+                                $extdata['time'] = $output[1];
+                                $extdata['author'] = $output[2];
+                            }
+                        }
+
+                    }
+
+                    $extlist[] = $extdata;
+                }
+            }
+            if (sizeof($extlist)) {
+                return "Installed extensions:\n" . sendAsFlatTable($extlist);
+            } else {
+                return "No installed extensions\n";
+            }
+            break;
+
+        /**
+         * List of extension keys - nothing else.
+         * Alphabetical order.
+         * Useful for making a diff between two sites.
+         */
+        case 'key-list' :
+
+            foreach ($showOnlyExts as $i => $extkey) {
+                $config = $EM_CONF[$extkey];
+                if (!$ext || preg_match("/$ext/", $extkey) || preg_match("/$ext/", $config['title'])) {
+                    $extdata = array(
+                        'key' => $extkey,
+                    );
+
+                    $extlist[$extkey] = $extdata;
+                }
+            }
+
+            if (sizeof($extlist)) {
+                ksort($extlist);
+                $extlist = array_values($extlist);
+                return "Installed extensions:\n" . sendAsFlatTable($extlist);
+            } else {
+                return "No installed extensions\n";
+            }
+
+            break;
+
+        case 'mentions' :
+
+            $extkeys = array();
+
+            $from = trim(strtolower($args[0]));
+            $from = $from ? explode(',', $from) : NULL;
+            $to = trim(strtolower($args[1]));
+            $to = $to ? explode(',', $to) : NULL;
+
+
+            foreach ($EM_CONF as $extkey => &$config) {
+
+                // check git
+                $path = PATH_site . $config['added by t3tool']['path'] . $extkey;
+                if (is_file($path . '/.git') || is_dir($path . '/.git')) {
+                    /**
+                     * Git log
+                     */
+                    $output = [];
+                    exec("cd " . PATH_site . 'typo3conf/ext/' . $extkey . "; if [ -d .git ]; then git log -1 --pretty=format:%H%n%ai%n%an; fi", $output);
+                    $config['added by t3tool']['git'] = [
+                        'repo' => [
+                            'name' => $extkey,
+                            'url' => 'https://github.com/Bolius/' . $extkey,
+                        ],
+                        'head' => [
+                            'sha' => $output[0],
+                            'sha-abbr' => substr($output[0], 0, 7),
+                            'time' => $output[1],
+                            'author' => $output[2],
+                            'url' => 'https://github.com/Bolius/' . $extkey . '/commit/' . $output[0],
+                        ],
+                    ];
+                }
+
+
+            }
+            $mentionsStruct = [
+                'grepTimestamp' => time(),
+                'grepDatetime' => date(DATE_W3C, time()),
+                'hostName' => file_get_contents('/etc/hostname'),
+                'siteRootPath' => getcwd(),
+            ];
+
+            // make list of strings to search for
+            foreach ($EM_CONF as $_EXTKEY => $config) {
+                if ($EM_CONF[$_EXTKEY]['added by t3tool']['installed'] &&
+                    $EM_CONF[$_EXTKEY]['added by t3tool']['type'] == 'Local' &&
+                    !in_array($_EXTKEY, $exclude)
+                ) {
+                    $prefixes[$_EXTKEY][] = $_EXTKEY;
+                    $prefixes[$_EXTKEY][] = str_replace('_', '', $_EXTKEY);
+                    $prefixes[$_EXTKEY][] = 'tx_' . str_replace('_', '', $_EXTKEY);
+                }
+
+            }
+
+            // do search
+            foreach ($EM_CONF as $_EXTKEY => $config) {
+                if ($EM_CONF[$_EXTKEY]['added by t3tool']['installed'] &&
+                    $EM_CONF[$_EXTKEY]['added by t3tool']['type'] == 'Local' &&
+                    !in_array($_EXTKEY, $exclude)
+
+                ) {
+
+                    $path = $EM_CONF[$_EXTKEY]['added by t3tool']['path'] . $_EXTKEY;
+                    foreach ($prefixes as $dependee => $temp) {
+                        // if either is excluded, do not search
+                        if (in_array($_EXTKEY, $exclude) || in_array($dependee, $exclude)) {
                             continue;
                         }
-
-                        if (! isset($byDependeeHtml[$dependeeKey])) {
-                            $byDependeeHtml[$dependeeKey] .= '<img src="data/' . md5('by-dependee-' . $dependeeKey) . '.png">';
+                        // if arg-0 is set and neither is in arg-0, do not search
+                        if ($from) {
+                            if ($to) {
+                                if (!in_array_wildcard($_EXTKEY, $from) || !in_array_wildcard($dependee, $to)) {
+                                    continue;
+                                }
+                            } else {
+                                if (!in_array_wildcard($_EXTKEY, $from) && !in_array_wildcard($dependee, $from)) {
+                                    continue;
+                                }
+                            }
                         }
 
-                        $hasDependency = isset($by_depender_wo_version[$dependerKey][$dependeeKey]);
-                        $hasReverseDependency = isset($by_depender_wo_version[$dependeeKey][$dependerKey]);
-                        $hasReverseMention = isset($mentions[$dependeeKey][$dependerKey]);
 
-                        $fileextensions = [];
-                        $filesHtml = '';
-                        foreach ($dependee['mentions'] as $file => $hunks) {
-                            if (preg_match(';\.([^.]{2,4})$;', $file, $m)) {
-                                $fileextension = $m[1];
-                                $fileextensions[$fileextension] = TRUE;
+                        if ($dependee != $_EXTKEY) {
+                            if ($_EXTKEY != $__EXTKEY) {
+                                output_cmd('Searching ' . $_EXTKEY);
+                                output_progress_start();
                             }
-                            $fileHtml = '';
-                            $fileHtml .= sprintf('<div class="git-info">git : <a href="%s/tree/%s/%s">%s</a></div>',
-                                $mentions[$dependerKey]['git']['repo']['url'],
-                                $mentions[$dependerKey]['git']['head']['sha'],
-                                $file,
-                                $mentions[$dependerKey]['git']['head']['sha']
-                            );
-                                $fileHtml .= '<table class="codelines diff-table">';
-                            foreach ($hunks as $hunkNum => $hunk) {
-                                $hunkHtml = '';
+                            $linenumbers = [];
+                            $fileHunks = [];
 
-//                                $hunkHtml .= '<tr><td class=\'linenumber blob-num blob-num-expandable\'><svg aria-hidden="true" class="octicon octicon-unfold" height="16" version="1.1" viewBox="0 0 14 16" width="14"><path fill-rule="evenodd" d="M11.5 7.5L14 10c0 .55-.45 1-1 1H9v-1h3.5l-2-2h-7l-2 2H5v1H1c-.55 0-1-.45-1-1l2.5-2.5L0 5c0-.55.45-1 1-1h4v1H1.5l2 2h7l2-2H9V4h4c.55 0 1 .45 1 1l-2.5 2.5zM6 6h2V3h2L7 0 4 3h2v3zm2 3H6v3H4l3 3 3-3H8V9z"></path></svg></td>';
-//                                $hunkHtml .= sprintf("<td class='code blob-code blob-code-inner blob-code-hunk'>@@ +%d,%d @@ %s</td></tr>\n", $hunk['firstLine'], $hunk['lastLine'] - $hunk['firstLine'], $hunk['label']);
-                           $hunkHtml .= '<tr><td colspan="100%">' . implode($hunk['roles']) . '</td></tr>';
+                            $dependencyExists = isset($by_depender_wo_version[$_EXTKEY][$dependee]);
 
-                                foreach ($hunk['code'] as $lineNum => $codeLine) {
+                            foreach ($temp as $prefix) {
+                                //echo "$prefix ,";
+                                $command = "cd $path; ";
+                                /**
+                                 * Search recursively all of extension dir, but exclude
+                                 * - ext_emconf.php, as it contains dependencies, not mentions
+                                 * - composer.json, same reason
+                                 * - .git/ as it contains old, possibly removed, code
+                                 *
+                                 * If file extensions to include is specified, use them.
+                                 *
+                                 */
+                                $command .= 'grep -rni --exclude="composer.json" --exclude="ext_emconf.php" --exclude-dir=".git"';
+                                if (getOption('include-files')) {
+                                    $command .= ' --include="' . getOption('include-files') . '"';
+                                }
+                                $command .= ' "' . $prefix . '" .';
+                                $output = NULL;
+                                exec($command, $output);
+                                if (sizeof($output)) {
 
-                                    $codeLine = trim($codeLine, "\n");
-                                    $codeLine = htmlentities($codeLine);
-                                    $codeLine = str_replace(array("\t", " "), array("&nbsp;&nbsp;", "&nbsp;"), $codeLine);
+                                    $mentions_exts[$_EXTKEY] = 1;
+                                    $mentions_exts[$dependee] = 1;
 
-                                    $tdClasses0 = ['blob-num'];
-                                    $tdClasses1 = ['blob-code'];
-                                    foreach ($hunk['strings'] as $string) {
-                                        if (preg_match(';' . $string . ';i', $codeLine)) {
-                                            $tdClasses0[] = 'blob-num-addition';
-                                            $tdClasses1[] = 'blob-code-addition';
-                                            $codeLine = preg_replace(';' . $string . ';i', '<span class="x">\\0</span>', $codeLine);
+                                    // determine file extensions
+                                    $fileextensions = array();
+
+                                    foreach ($output as $file) {
+
+                                        $mentionsStruct['extensions'][$_EXTKEY]['git'] = $EM_CONF[$_EXTKEY]['added by t3tool']['git'];
+                                        $header_ext = "\n$_EXTKEY -> $dependee :";
+
+                                        if ($header_ext != $_header_ext) {
+                                            $_header_ext = $header_ext;
+                                        }
+                                        if (preg_match(';^\./(.+\.([a-z0-9]{1,4})):([0-9]+):(.+)$;', $file, $m)) {
+                                            $filepath = $m[1];
+                                            $fileextension = $m[2];
+                                            $linenum = $m[3];
+                                            $linenum_padded = str_pad($linenum, 4, ' ', STR_PAD_LEFT);
+                                            $line = trim($m[4], " \t");
+
+                                            $linenumbers[$filepath][$linenum] = 1;
+
+                                            if ($filepath != $_filepath) {
+                                                $mention = array(
+                                                    'file' => $filepath,
+                                                    'extension' => $fileextension,
+                                                    'linenum' => $linenum,
+                                                    'code' => $line,
+                                                );
+                                                $_filepath = $filepath;
+                                            }
+                                            $fileextensions[$fileextension] = TRUE;
+
                                         }
                                     }
 
-                                    $gitLineUrl = sprintf('%s/tree/%s/%s#L%d',
-                                        $mentions[$dependerKey]['git']['repo']['url'],
-                                        $mentions[$dependerKey]['git']['head']['sha'],
-                                        $file,
-                                        $lineNum,
-                                        $mentions[$dependerKey]['git']['head']['sha']
+                                    $mentions[$_EXTKEY][$dependee] = implode(',', array_keys($fileextensions)) . ' (' . sizeof($output) . ')';
 
-                                    );
 
-                                    $hunkHtml .= sprintf("<tr><td class='%s'><a href='%s'>%s</a></td>", implode(' ', $tdClasses0), $gitLineUrl, $lineNum);
-                                    $hunkHtml .= sprintf("<td class='%s'><span class='blob-code-inner'>%s</span></td>", implode(' ', $tdClasses1), $codeLine);
-//                                    $hunkHtml .= sprintf("<td class='%s'><span class='blob-code-inner'><a href='%s'>[git]</a></span></td>", '', $gitLineUrl);
-                                    $hunkHtml .= '</tr>';
+                                }
+                                echo ".";
+                            }
+                            if (sizeof($linenumbers)) {
+
+                                foreach ($linenumbers as $file => $linenums) {
+                                    $filepath = PATH_site . $path . '/' . $file;
+                                    $codeLines = file(PATH_site . $path . '/' . $file);
+
+                                    // run through all hunks, and add the search strings that each of them contain
+                                    foreach (t3tool_convert_linenumbers_to_hunks($linenums, $codeLines) as $hunk) {
+                                        $strings = [];
+                                        $roles = [];
+                                        foreach ($hunk['code'] as $codeLine) {
+                                            foreach ($temp as $prefix) {
+                                                if (preg_match(';' . $prefix . ';i', $codeLine)) {
+                                                    $strings[$prefix] = TRUE;
+                                                    $roles[t3tool_code_get_string_role($codeLine, $prefix)] = TRUE;
+                                                }
+                                            }
+                                        }
+                                        $hunk['strings'] = array_keys($strings);
+                                        $hunk['roles'] = array_keys($roles);
+                                        /**
+                                         * Git blame
+                                         */
+                                        $firstLine = $hunk['firstLine'];
+                                        $lastLine = $hunk['lastLine'];
+                                        $command = "cd " . PATH_site . $path . "; if [ -d .git ]; then git blame -L $firstLine,$lastLine $filepath; fi";
+                                        $output = array();
+                                        exec($command, $output);
+                                        if (sizeof($output)) {
+                                            $hunk['git-blame'] = $output;
+                                        }
+                                        $mentionsStruct['extensions'][$_EXTKEY]['mentionees'][$dependee]['mentions'][$file][] = $hunk;
+
+
+                                    }
+
+                                }
+                            }
+                            if ($_EXTKEY != $__EXTKEY) {
+                                output_ok();
+                                $__EXTKEY = $_EXTKEY;
+                            }
+
+                        }
+
+                    }
+                }
+
+            }
+
+            file_put_contents(PATH_t3tool . 'mentions.json', json_encode($mentionsStruct, JSON_PRETTY_PRINT));
+
+            break;
+
+        case 'mentions-report' :
+
+            $reportPath = getOption('reportPath') ?: 'mentions/';
+            $reportPath = trim($reportPath, '/') . '/';
+
+            if (!is_dir(PATH_reports . $reportPath . 'data/')) {
+                mkdir(PATH_reports . $reportPath . 'data/', 0777, TRUE);
+            }
+
+            $json = file_get_contents(PATH_t3tool . 'mentions.json');
+            $mentions = json_decode($json, JSON_OBJECT_AS_ARRAY);
+
+            $extHtml = [];
+            $byDependeeHtml = [];
+            $dependeeDot = [];
+            $fullDot = '';
+
+            output_cmd('Building report');
+
+            foreach ($mentions['extensions'] as $dependerKey => $depender) {
+
+
+
+                $dependerDot = "$dependerKey [shape=box]\n";
+
+
+                if (isset($depender['git'])) {
+                    $extHtml[$dependerKey] .= sprintf('<div class="git-info">git : <a href="%s/tree/%s">%s</a></div>',
+                        $depender['git']['repo']['url'],
+                        $depender['git']['head']['sha'],
+                        $depender['git']['head']['sha-abbr']
+                    );
+                }
+                $extHtml[$dependerKey] .= '<img src="data/' . md5('by-depender-' . $dependerKey) . '.png">';
+
+
+                foreach ($depender['mentionees'] as $dependeeKey => $dependee) {
+
+                    if (!isset($byDependeeHtml[$dependeeKey])) {
+                        $byDependeeHtml[$dependeeKey] .= '<img src="data/' . md5('by-dependee-' . $dependeeKey) . '.png">';
+                    }
+
+                    $hasDependency = isset($by_depender_wo_version[$dependerKey][$dependeeKey]);
+                    $hasReverseDependency = isset($by_depender_wo_version[$dependeeKey][$dependerKey]);
+                    $hasReverseMention = isset($mentions['extensions'][$dependeeKey][$dependerKey]);
+
+                    $fileextensions = [];
+                    $filesHtml = '';
+                    foreach ($dependee['mentions'] as $file => $hunks) {
+                        if (preg_match(';\.([^.]{2,4})$;', $file, $m)) {
+                            $fileextension = $m[1];
+                            $fileextensions[$fileextension] = TRUE;
+                        }
+                        $fileHtml = '';
+                        $fileHtml .= sprintf('<div class="git-info">git : <a href="%s/tree/%s/%s">%s</a></div>',
+                            $mentions['extensions'][$dependerKey]['git']['repo']['url'],
+                            $mentions['extensions'][$dependerKey]['git']['head']['sha'],
+                            $file,
+                            $mentions['extensions'][$dependerKey]['git']['head']['sha-abbr']
+                        );
+                        $fileHtml .= '<table class="codelines diff-table">';
+                        foreach ($hunks as $hunkNum => $hunk) {
+                            $hunkHtml = '';
+
+//                                $hunkHtml .= '<tr><td class=\'linenumber blob-num blob-num-expandable\'><svg aria-hidden="true" class="octicon octicon-unfold" height="16" version="1.1" viewBox="0 0 14 16" width="14"><path fill-rule="evenodd" d="M11.5 7.5L14 10c0 .55-.45 1-1 1H9v-1h3.5l-2-2h-7l-2 2H5v1H1c-.55 0-1-.45-1-1l2.5-2.5L0 5c0-.55.45-1 1-1h4v1H1.5l2 2h7l2-2H9V4h4c.55 0 1 .45 1 1l-2.5 2.5zM6 6h2V3h2L7 0 4 3h2v3zm2 3H6v3H4l3 3 3-3H8V9z"></path></svg></td>';
+//                                $hunkHtml .= sprintf("<td class='code blob-code blob-code-inner blob-code-hunk'>@@ +%d,%d @@ %s</td></tr>\n", $hunk['firstLine'], $hunk['lastLine'] - $hunk['firstLine'], $hunk['label']);
+                            $hunkHtml .= '<tr><td colspan="100%">' . implode($hunk['roles']) . '</td></tr>';
+
+                            foreach ($hunk['code'] as $lineNum => $codeLine) {
+
+                                $codeLine = trim($codeLine, "\n");
+                                $codeLine = htmlentities($codeLine);
+                                $codeLine = str_replace(array("\t", " "), array("&nbsp;&nbsp;", "&nbsp;"), $codeLine);
+
+                                $tdClasses0 = ['blob-num'];
+                                $tdClasses1 = ['blob-code'];
+                                foreach ($hunk['strings'] as $string) {
+                                    if (preg_match(';' . $string . ';i', $codeLine)) {
+                                        $tdClasses0[] = 'blob-num-addition';
+                                        $tdClasses1[] = 'blob-code-addition';
+                                        $codeLine = preg_replace(';' . $string . ';i', '<span class="x">\\0</span>', $codeLine);
+                                    }
                                 }
 
-                                $hunkHtml .= '';
+                                $gitLineUrl = sprintf('%s/tree/%s/%s#L%d',
+                                    $mentions['extensions'][$dependerKey]['git']['repo']['url'],
+                                    $mentions['extensions'][$dependerKey]['git']['head']['sha'],
+                                    $file,
+                                    $lineNum,
+                                    $mentions['extensions'][$dependerKey]['git']['head']['sha-abbr']
+
+                                );
+
+                                $hunkHtml .= sprintf("<tr><td class='%s'><a href='%s'>%s</a></td>", implode(' ', $tdClasses0), $gitLineUrl, $lineNum);
+                                $hunkHtml .= sprintf("<td class='%s'><span class='blob-code-inner'>%s</span></td>", implode(' ', $tdClasses1), $codeLine);
+//                                    $hunkHtml .= sprintf("<td class='%s'><span class='blob-code-inner'><a href='%s'>[git]</a></span></td>", '', $gitLineUrl);
+                                $hunkHtml .= '</tr>';
+                            }
+
+                            $hunkHtml .= '';
 //                                $fileHtml .= t3tool_report_write_report_part($reportPath, $dependerKey . $dependeeKey . $file . $hunkNum, $hunkNum, $hunkHtml);
-                                $fileHtml .= $hunkHtml;
-                            }
-                                $fileHtml .= '</table>';
-                            $fileHeader = '<div class="file-header"><div class="file-info">' . $file . ' (' . sizeof($hunks) . ' times)</div></div>';
-
-                            $filesHtml .= t3tool_report_write_report_part($reportPath, $dependerKey . $dependeeKey . $file, $fileHeader, $fileHtml);
-
+                            $fileHtml .= $hunkHtml;
                         }
+                        $fileHtml .= '</table>';
+                        $fileHeader = '<div class="file-header"><div class="file-info">' . $file . ' (' . sizeof($hunks) . ' times)</div></div>';
 
-                        $filesHtml = sprintf('<div class="git-info">git : <a href="%s/tree/%s">%s</a></div>',
-                            $mentions[$dependerKey]['git']['repo']['url'],
-                            $mentions[$dependerKey]['git']['head']['sha'],
-                            $mentions[$dependerKey]['git']['head']['sha']
-                        ) . $filesHtml;
-
-
-                        $class = '';
-                        if (! $hasDependency) {
-                            $class = 'status-warning';
-                        }
-                        $extHtml[$dependerKey] .= t3tool_report_write_report_part($reportPath, $dependerKey . $dependeeKey, '-> ' . $dependeeKey . ' (' . sizeof($dependee['mentions']) . ' files)' . ($hasDependency ? '' : ' - not declared'), $filesHtml, $class);
-
-
-                        $byDependeeHtml[$dependeeKey] .= t3tool_report_write_report_part($reportPath, $dependerKey . $dependeeKey, $dependerKey . ' -> (' . sizeof($dependee['mentions']) . ' files)' . ($hasDependency ? '' : ' - not declared'), $filesHtml);
-
-                        // determine dot styles
-                        $linestyle = 'dashed';
-                        $arrow = '->';
-                        $arrowstyle = 'normal';
-                        $lineLabel = implode(',', array_keys($fileextensions));
-
-                        // we have a declared dependency - all is fine ...
-                        if (isset($by_depender_wo_version[$dependerKey][$dependeeKey])) {
-                            $linestyle = 'solid';
-
-                            // ... except if it goes both ways !
-                            if (isset($mentions[$dependeeKey][$dependerKey])) {
-//									$linestyle = 'bold';
-                            }
-                        }
-
-                        // if it goes both ways !
-                        if (isset($mentions[$dependeeKey][$dependerKey])) {
-//								$linestyle = 'bold';
-                        }
-
-                        $dependerDot .= "  $dependeeKey [shape=box];\n";
-                        $dependerDot .= "  $dependerKey -> $dependeeKey [label=\"$lineLabel\" style=\"$linestyle\"];\n";
-                        //$dependeeDot[$dependeeKey] .= "  $dependeeKey [shape=box];\n";
-                        $dependeeDot[$dependeeKey] .= "  $dependerKey -> $dependeeKey [label=\"$lineLabel\" style=\"$linestyle\"];\n";
-                        $fullDot .= "  $dependeeKey [shape=box];\n";
-                        $fullDot .= "  $dependerKey -> $dependeeKey [label=\"$lineLabel\" style=\"$linestyle\"];\n";
+                        $filesHtml .= t3tool_report_write_report_part($reportPath, $dependerKey . $dependeeKey . $file, $fileHeader, $fileHtml);
 
                     }
 
+                    $filesHtml = sprintf('<div class="git-info">git : <a href="%s/tree/%s">%s</a></div>',
+                            $mentions['extensions'][$dependerKey]['git']['repo']['url'],
+                            $mentions['extensions'][$dependerKey]['git']['head']['sha'],
+                            $mentions['extensions'][$dependerKey]['git']['head']['sha-abbr']
+                        ) . $filesHtml;
+
+
+                    $class = '';
+                    if (!$hasDependency) {
+                        $class = 'status-warning';
+                    }
+                    $extHtml[$dependerKey] .= t3tool_report_write_report_part($reportPath, $dependerKey . $dependeeKey, '-> ' . $dependeeKey . ' (' . sizeof($dependee['mentions']) . ' files)' . ($hasDependency ? '' : ' - not declared'), $filesHtml, $class);
+
+
+                    $byDependeeHtml[$dependeeKey] .= t3tool_report_write_report_part($reportPath, $dependerKey . $dependeeKey, $dependerKey . ' -> (' . sizeof($dependee['mentions']) . ' files)' . ($hasDependency ? '' : ' - not declared'), $filesHtml);
+
+                    // determine dot styles
+                    $linestyle = 'dashed';
+                    $arrow = '->';
+                    $arrowstyle = 'normal';
+                    $lineLabel = implode(',', array_keys($fileextensions));
+
+                    // we have a declared dependency - all is fine ...
+                    if (isset($by_depender_wo_version[$dependerKey][$dependeeKey])) {
+                        $linestyle = 'solid';
+
+                        // ... except if it goes both ways !
+                        if (isset($mentions['extensions'][$dependeeKey][$dependerKey])) {
+//									$linestyle = 'bold';
+                        }
+                    }
+
+                    // if it goes both ways !
+                    if (isset($mentions[$dependeeKey][$dependerKey])) {
+//								$linestyle = 'bold';
+                    }
+
+                    $dependerDot .= "  $dependeeKey [shape=box];\n";
+                    $dependerDot .= "  $dependerKey -> $dependeeKey [label=\"$lineLabel\" style=\"$linestyle\"];\n";
+                    //$dependeeDot[$dependeeKey] .= "  $dependeeKey [shape=box];\n";
+                    $dependeeDot[$dependeeKey] .= "  $dependerKey -> $dependeeKey [label=\"$lineLabel\" style=\"$linestyle\"];\n";
+                    $fullDot .= "  $dependeeKey [shape=box];\n";
+                    $fullDot .= "  $dependerKey -> $dependeeKey [label=\"$lineLabel\" style=\"$linestyle\"];\n";
+
+                }
+
                 output_cmd('Building graphs');
-                    $dependerDot = 	$output = "digraph extension_mentions {
+                $dependerDot = $output = "digraph extension_mentions {
     rankdir=BT;
 				size =\"60,60\";
 				labelloc = \"t\";
 			sep=\"+25,25\";
 overlap=scalexy;
 nodesep=0.6;" . $dependerDot . "\n}";
-                    $dotFilePath = PATH_reports . $reportPath . 'data/' . md5('by-depender-' . $dependerKey) . '.dot';
-                    $pngFilePath = PATH_reports . $reportPath . 'data/' . md5('by-depender-' . $dependerKey) . '.png';
-                    file_put_contents($dotFilePath, $dependerDot);
-                    system('dot -Tpng ' . $dotFilePath. ' -o ' . $pngFilePath);
+                $dotFilePath = PATH_reports . $reportPath . 'data/' . md5('by-depender-' . $dependerKey) . '.dot';
+                $pngFilePath = PATH_reports . $reportPath . 'data/' . md5('by-depender-' . $dependerKey) . '.png';
+                file_put_contents($dotFilePath, $dependerDot);
+                system('dot -Tpng ' . $dotFilePath . ' -o ' . $pngFilePath);
 
 
+            }
 
-                }
-
-                output_ok();
-                foreach ($dependeeDot as $dependeeKey => $dot) {
-                    $dot = "digraph extension_mentions {
+            output_ok();
+            foreach ($dependeeDot as $dependeeKey => $dot) {
+                $dot = "digraph extension_mentions {
     rankdir=BT;
 				size =\"60,60\";
 				labelloc = \"t\";
 			sep=\"+25,25\";
 overlap=scalexy;
 nodesep=0.6;" . $dot . "\n}";
-                    $dotFilePath = PATH_reports . $reportPath . 'data/' . md5('by-dependee-' . $dependeeKey) . '.dot';
-                    $pngFilePath = PATH_reports . $reportPath . 'data/' . md5('by-dependee-' . $dependeeKey) . '.png';
-                    file_put_contents($dotFilePath, $dot);
-                    system('dot -Tpng ' . $dotFilePath. ' -o ' . $pngFilePath);
-                }
+                $dotFilePath = PATH_reports . $reportPath . 'data/' . md5('by-dependee-' . $dependeeKey) . '.dot';
+                $pngFilePath = PATH_reports . $reportPath . 'data/' . md5('by-dependee-' . $dependeeKey) . '.png';
+                file_put_contents($dotFilePath, $dot);
+                system('dot -Tpng ' . $dotFilePath . ' -o ' . $pngFilePath);
+            }
 
-                $fullDot = "digraph extension_mentions {
+            $fullDot = "digraph extension_mentions {
     rankdir=BT;
 				size =\"200,200\";
 				labelloc = \"t\";
 			sep=\"+25,25\";
 overlap=scalexy;
 nodesep=0.6;" . $fullDot . "\n}";
-                $dotFilePath = PATH_reports . $reportPath . 'data/full.dot';
-                $pngFilePath = PATH_reports . $reportPath . 'data/full.png';
-                file_put_contents($dotFilePath, $fullDot);
-                system('dot -Tpng ' . $dotFilePath. ' -o ' . $pngFilePath);
+            $dotFilePath = PATH_reports . $reportPath . 'data/full.dot';
+            $pngFilePath = PATH_reports . $reportPath . 'data/full.png';
+            file_put_contents($dotFilePath, $fullDot);
+            system('dot -Tpng ' . $dotFilePath . ' -o ' . $pngFilePath);
 
-                output_ok();
+            output_ok();
 
-                $indexHtml = '
+            $indexHtml = '
                 <script src="//code.jquery.com/jquery-3.3.1.min.js"></script>
                 <link rel="stylesheet" href="../reports.css">
                 <script src="../reports.js"></script>
                 ';
-                $byDependerHtml = '';
-                foreach ($extHtml as $ext => $html) {
-                    $byDependerHtml .= t3tool_report_write_report_part($reportPath, 'by-depender-' . $ext, $ext, $html);
+            $byDependerHtml = '';
+            foreach ($extHtml as $ext => $html) {
+                $byDependerHtml .= t3tool_report_write_report_part($reportPath, 'by-depender-' . $ext, $ext, $html);
+            }
+            foreach ($byDependeeHtml as $ext => $html) {
+                $byDependeeHtml .= t3tool_report_write_report_part($reportPath, 'by-dependee-' . $ext, $ext, $html);
+            }
+
+            $indexHtml .= t3tool_report_write_report_part($reportPath, 'report-info', 'Report info', '
+            <ul>
+            <li>Grep time : ' . $mentions['grepDatetime'] . '</li>
+            <li>Report build time : ' . date(DATE_W3C, time()) . '</li>
+            <li>Host name : ' . $mentions['hostName']  . '</li>
+            <li>TYPO3 root path : ' . $mentions['siteRootPath']  . '</li>
+            </ul>
+            ');
+            $indexHtml .= t3tool_report_write_report_part($reportPath, 'by-depender', 'Extensions by depender', $byDependerHtml);
+            $indexHtml .= t3tool_report_write_report_part($reportPath, 'by-dependee', 'Extensions by dependee', $byDependeeHtml);
+            file_put_contents(PATH_reports . $reportPath . 'index.html', $indexHtml);
+
+            break;
+
+        #
+        # Show content of ext_emconf.php file and global configuration.
+        #
+        case 'show' :
+
+            if (!trim($ext)) {
+                return ("Usage : t3tool ext show <extkey>.\n");
+            }
+            return print_R($EM_CONF[$ext], 1) . "\n" . print_R(unserialize($GLOBALS['TYPO3_CONF_VARS']['EXT']['extConf'][$ext]), 1);
+            break;
+
+            break;
+
+
+        case 'install' :
+        case 'enable' :
+            if (!isset($EM_CONF[$ext])) {
+                return ("Extension not present\n");
+            }
+            if (in_array($ext, $exts)) {
+                return ("Extension already installed\n");
+            }
+
+            echo "Installing $ext... ";
+
+            if ($GLOBALS['version_4']) {
+                if ($local) {
+                    appendToPHPFile(getConfFilename($local), '$GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extList"] .= ",' . $ext . '"');
+                } else {
+                    setLocalConf('EXT.extList', $GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extList"] . ',' . $ext . ';', $local);
                 }
-                foreach ($byDependeeHtml as $ext => $html) {
-                    $byDependeeHtml .= t3tool_report_write_report_part($reportPath, 'by-dependee-' . $ext, $ext, $html);
+            } else {
+                if ($local) {
+                    appendToPHPFile(getConfFilename($local), '$GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extListArray"][] = "' . $ext . '";');
+                } else {
+                    if (!in_array($ext, $GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extListArray"])) {
+                        $GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extListArray"][] = $ext;
+                    }
+                    if (!isset($GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extConf"][$ext])) {
+                        $GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extConf"][$ext] = serialize(array());
+                    }
+                    setLocalConf('EXT.extListArray', $GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extListArray"], $local);
                 }
-
-                    $indexHtml .= t3tool_report_write_report_part($reportPath, 'by-depender', 'By depender', $byDependerHtml);
-                    $indexHtml .= t3tool_report_write_report_part($reportPath, 'by-dependee', 'By dependee', $byDependeeHtml);
-                file_put_contents(PATH_reports . $reportPath . 'index.html', $indexHtml);
-
-                break;
-
-			#
-			# Show content of ext_emconf.php file and global configuration.
-			#
-			case 'show' :
-
-				if (!trim($ext)) {
-					return ("Usage : t3tool ext show <extkey>.\n");
-				}
-				return print_R($EM_CONF[$ext], 1) . "\n" . print_R(unserialize($GLOBALS['TYPO3_CONF_VARS']['EXT']['extConf'][$ext]), 1);
-				break;
-
-				break;
+            }
 
 
-			case 'install' :
-			case 'enable' :
-				if (!isset($EM_CONF[$ext])) {
-					return ("Extension not present\n");
-				}
-				if (in_array($ext, $exts)) {
-					return ("Extension already installed\n");
-				}
+            output_ok();
+            t3tool_cc_code();
+            break;
 
-				echo "Installing $ext... ";
+        case 'uninstall' :
+        case 'disable':
+            if (!in_array($ext, $exts)) {
+                return ("Extension not installed\n");
+            }
+            echo "Uninstalling $ext... ";
 
-				if ($GLOBALS['version_4']) {
-					if ($local) {
-						appendToPHPFile(getConfFilename($local), '$GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extList"] .= ",' . $ext . '"');
-					} else {
-						setLocalConf('EXT.extList', $GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extList"] . ',' . $ext . ';', $local);
-					}
-				} else {
-					if ($local) {
-						appendToPHPFile(getConfFilename($local), '$GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extListArray"][] = "' . $ext . '";');
-					} else {
-						if (!in_array($ext, $GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extListArray"])) {
-							$GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extListArray"][] = $ext;
-						}
-						if (!isset($GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extConf"][$ext])) {
-							$GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extConf"][$ext] = serialize(array());
-						}
-						setLocalConf('EXT.extListArray', $GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extListArray"], $local);
-					}
-				}
+            if (getOption('l')) {
 
-
-				output_ok();
-				t3tool_cc_code();
-				break;
-
-			case 'uninstall' :
-			case 'disable':
-				if (!in_array($ext, $exts)) {
-					return ("Extension not installed\n");
-				}
-				echo "Uninstalling $ext... ";
-
-				if (getOption('l')) {
-
-					// this is a relative model
-					if ($GLOBALS['version_4']) {
-						writeToConfFile('$GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extList"] = preg_replace(";(^|,)' . $ext . '($|,);", ",", $GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extList"]);');
-					}
-					if ($GLOBALS['version_6']) {
-						writeToConfFile('$i = array_search("' . $ext . '", $GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extListArray"]); if ($i) {
+                // this is a relative model
+                if ($GLOBALS['version_4']) {
+                    writeToConfFile('$GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extList"] = preg_replace(";(^|,)' . $ext . '($|,);", ",", $GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extList"]);');
+                }
+                if ($GLOBALS['version_6']) {
+                    writeToConfFile('$i = array_search("' . $ext . '", $GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extListArray"]); if ($i) {
             unset($GLOBALS["TYPO3_CONF_VARS"]["EXT"]["extListArray"][$i]);
           }');
-					}
-				} else {
+                }
+            } else {
 
-				}
-				echo "ok.\n";
-				t3tool_cc_code();
-				break;
-
-
-			case 'dep' :
-			case 'dependencies' :
-				echo "Dependencies by depender:\n";
-				foreach ($by_depender as $depender => $dependees) {
-					echo "  $depender -> :\n";
-					foreach ($dependees as $dependee => $version) {
-						echo "    $dependee $version\n";
-					}
-				}
-
-				echo "\n";
-				echo "Dependencies by dependee:\n";
-				foreach ($by_dependee as $dependee => $versions) {
-					ksort($versions);
-					echo "  -> $dependee :\n";
-					foreach ($versions as $version => $dependers) {
-						if (!$version) {
-							$version = 'any';
-						}
-						echo "    $version :\n";
-						foreach ($dependers as $depender => $version) {
-							echo "      $depender\n";
-						}
-
-					}
-				}
+            }
+            echo "ok.\n";
+            t3tool_cc_code();
+            break;
 
 
-				if (getOption('dot')) {
-					// for this, we remove TYPO3 and PHP
-					foreach ($by_depender as $depender => $dependees) {
-						unset($by_depender[$depender]['typo3']);
-						unset($by_depender[$depender]['php']);
-					}
+        case 'dep' :
+        case 'dependencies' :
+            echo "Dependencies by depender:\n";
+            foreach ($by_depender as $depender => $dependees) {
+                echo "  $depender -> :\n";
+                foreach ($dependees as $dependee => $version) {
+                    echo "    $dependee $version\n";
+                }
+            }
 
-					$exts = array();
+            echo "\n";
+            echo "Dependencies by dependee:\n";
+            foreach ($by_dependee as $dependee => $versions) {
+                ksort($versions);
+                echo "  -> $dependee :\n";
+                foreach ($versions as $version => $dependers) {
+                    if (!$version) {
+                        $version = 'any';
+                    }
+                    echo "    $version :\n";
+                    foreach ($dependers as $depender => $version) {
+                        echo "      $depender\n";
+                    }
 
-					// remove all non-local
-					foreach ($by_depender as $depender_ => $dependees) {
-						foreach ($dependees as $dependee => $version) {
-							if (preg_match('/^(.*) (.*)$/', $depender_, $m)) {
-								$depender = $m[1];
-								$depender_version = $m[2];
-							}
-							if ($EM_CONF[$depender]['added by t3tool']['type'] == 'Local') {
-								$exts[$depender] = 1;
-							} else {
-								unset($by_depender[$depender_]);
-							}
-							if ($EM_CONF[$dependee]['added by t3tool']['type'] == 'Local') {
-								$exts[$dependee] = 1;
-							} else {
-								unset($by_depender[$depender_][$dependee]);
-							}
-						}
-					}
+                }
+            }
 
-					$output = "digraph extension_dependencies {
+
+            if (getOption('dot')) {
+                // for this, we remove TYPO3 and PHP
+                foreach ($by_depender as $depender => $dependees) {
+                    unset($by_depender[$depender]['typo3']);
+                    unset($by_depender[$depender]['php']);
+                }
+
+                $exts = array();
+
+                // remove all non-local
+                foreach ($by_depender as $depender_ => $dependees) {
+                    foreach ($dependees as $dependee => $version) {
+                        if (preg_match('/^(.*) (.*)$/', $depender_, $m)) {
+                            $depender = $m[1];
+                            $depender_version = $m[2];
+                        }
+                        if ($EM_CONF[$depender]['added by t3tool']['type'] == 'Local') {
+                            $exts[$depender] = 1;
+                        } else {
+                            unset($by_depender[$depender_]);
+                        }
+                        if ($EM_CONF[$dependee]['added by t3tool']['type'] == 'Local') {
+                            $exts[$dependee] = 1;
+                        } else {
+                            unset($by_depender[$depender_][$dependee]);
+                        }
+                    }
+                }
+
+                $output = "digraph extension_dependencies {
 			size =\"60,60\";
 			rankdir = BT;
 			sep=\"+25,25\";
@@ -1048,294 +936,315 @@ overlap=scalexy;
 nodesep=0.6;
 			";
 
-					foreach (array_keys($exts) as $ext) {
-						if ($EM_CONF[$ext]['added by t3tool']['type'] == 'Local') {
-							$output .= "  $ext [shape=box];\n";
-						} else {
-							$output .= "  $ext [shape=box];\n";
-						}
-					}
+                foreach (array_keys($exts) as $ext) {
+                    if ($EM_CONF[$ext]['added by t3tool']['type'] == 'Local') {
+                        $output .= "  $ext [shape=box];\n";
+                    } else {
+                        $output .= "  $ext [shape=box];\n";
+                    }
+                }
 
-					foreach ($by_depender as $depender_ => $dependees) {
-						foreach ($dependees as $dependee => $version) {
-							if (preg_match('/^(.*) (.*)$/', $depender_, $m)) {
-								$depender = $m[1];
-								$depender_version = $m[2];
-							}
+                foreach ($by_depender as $depender_ => $dependees) {
+                    foreach ($dependees as $dependee => $version) {
+                        if (preg_match('/^(.*) (.*)$/', $depender_, $m)) {
+                            $depender = $m[1];
+                            $depender_version = $m[2];
+                        }
 
-							$output .= "  $depender -> $dependee [label=\"$depender_version\"];\n";
-						}
-					}
-					$output .= "}";
+                        $output .= "  $depender -> $dependee [label=\"$depender_version\"];\n";
+                    }
+                }
+                $output .= "}";
 
-					$outputFile = getOption('output');
-					if ($outputFile) {
-						file_put_contents($outputFile, $output);
-					} else {
-						echo $output;
-					}
-				}
-
-
-				break;
-			case 'conflicts' :
-				foreach ($EM_CONF as $_EXTKEY => $config) {
-					$depender_version = $EM_CONF[$_EXTKEY]['version'];
-
-					// post 6-0
-					if (isset($EM_CONF[$_EXTKEY]['constraints']['conflicts'])) {
-						foreach ($EM_CONF[$_EXTKEY]['constraints']['conflicts'] as $dependee => $version) {
-							$by_depender[$_EXTKEY . ' ' . $depender_version][$dependee] = $version;
-							$by_dependee[$dependee][$version][$_EXTKEY] = TRUE;
-						}
-					} else {
-						// pre-6.0
-						if (isset($EM_CONF[$_EXTKEY]['conflicts'])) {
-							foreach (explode(',', $EM_CONF[$_EXTKEY]['conflicts']) as $dependee) {
-								$by_depender[$_EXTKEY . ' ' . $depender_version][$dependee] = TRUE;
-								$by_dependee[$dependee][$version][$_EXTKEY . '(' . $EM_CONF[$_EXTKEY]['version'] . ')'] = TRUE;
-							}
-						}
-					}
-				}
-
-				ksort($by_dependee);
-				echo "Conflicts by declarer :\n";
-				foreach ($by_depender as $depender => $dependees) {
-					echo "  $depender :\n";
-					foreach ($dependees as $dependee => $version) {
-						echo "    $dependee $version\n";
-					}
-				}
-
-				echo "Conflicts by conflictee :\n";
-				foreach ($by_dependee as $dependee => $versions) {
-					ksort($versions);
-					echo "  $dependee :\n";
-					foreach ($versions as $version => $dependers) {
-						if (!$version) {
-							$version = 'any';
-						}
-						echo "    $version :\n";
-						foreach ($dependers as $depender => $version) {
-							echo "      $depender\n";
-						}
-
-					}
-				}
-
-				break;
-
-			case 'foreach' :
-				$command = $args[0];
-				foreach ($showOnlyExts as $ext) {
-
-					$absPath = PATH_site . $EM_CONF[$ext]['added by t3tool']['path'] . $ext . '/';
-					if (!file_exists($absPath . '.git') && getOption('only-git')) {
-						continue;
-					}
-
-					echo COLOR_BOLD . "$ext :\n" . COLOR_RESET;
-					system('cd ' . $absPath . ';' . $command);
-					echo "\n";
+                $outputFile = getOption('output');
+                if ($outputFile) {
+                    file_put_contents($outputFile, $output);
+                } else {
+                    echo $output;
+                }
+            }
 
 
-				}
-				break;
-			default :
-		}
-	}
+            break;
+        case 'conflicts' :
+            foreach ($EM_CONF as $_EXTKEY => $config) {
+                $depender_version = $EM_CONF[$_EXTKEY]['version'];
+
+                // post 6-0
+                if (isset($EM_CONF[$_EXTKEY]['constraints']['conflicts'])) {
+                    foreach ($EM_CONF[$_EXTKEY]['constraints']['conflicts'] as $dependee => $version) {
+                        $by_depender[$_EXTKEY . ' ' . $depender_version][$dependee] = $version;
+                        $by_dependee[$dependee][$version][$_EXTKEY] = TRUE;
+                    }
+                } else {
+                    // pre-6.0
+                    if (isset($EM_CONF[$_EXTKEY]['conflicts'])) {
+                        foreach (explode(',', $EM_CONF[$_EXTKEY]['conflicts']) as $dependee) {
+                            $by_depender[$_EXTKEY . ' ' . $depender_version][$dependee] = TRUE;
+                            $by_dependee[$dependee][$version][$_EXTKEY . '(' . $EM_CONF[$_EXTKEY]['version'] . ')'] = TRUE;
+                        }
+                    }
+                }
+            }
+
+            ksort($by_dependee);
+            echo "Conflicts by declarer :\n";
+            foreach ($by_depender as $depender => $dependees) {
+                echo "  $depender :\n";
+                foreach ($dependees as $dependee => $version) {
+                    echo "    $dependee $version\n";
+                }
+            }
+
+            echo "Conflicts by conflictee :\n";
+            foreach ($by_dependee as $dependee => $versions) {
+                ksort($versions);
+                echo "  $dependee :\n";
+                foreach ($versions as $version => $dependers) {
+                    if (!$version) {
+                        $version = 'any';
+                    }
+                    echo "    $version :\n";
+                    foreach ($dependers as $depender => $version) {
+                        echo "      $depender\n";
+                    }
+
+                }
+            }
+
+            break;
+
+        case 'foreach' :
+            $command = $args[0];
+            foreach ($showOnlyExts as $ext) {
+
+                $absPath = PATH_site . $EM_CONF[$ext]['added by t3tool']['path'] . $ext . '/';
+                if (!file_exists($absPath . '.git') && getOption('only-git')) {
+                    continue;
+                }
+
+                echo COLOR_BOLD . "$ext :\n" . COLOR_RESET;
+                system('cd ' . $absPath . ';' . $command);
+                echo "\n";
 
 
-	function isInTer($extKey) {
-		if ($GLOBALS['version_4']) {
-			global $TYPO3_DB;
-			$intVer = convertVersionNumberToInteger($curVersion);
-			$res = sql_query('SELECT * FROM cache_extensions WHERE extkey = "' . $extKey . '"');
-			if ($row = sql_fetch_assoc($res)) {
-				return TRUE;
-			}
-		}
-		return FALSE;
-	}
-
-	function getSecureVersion($extKey, $curVersion) {
-		if ($GLOBALS['version_4']) {
-			global $TYPO3_DB;
-			$intVer = convertVersionNumberToInteger($curVersion);
-			$res = sql_query('SELECT * FROM cache_extensions WHERE extkey = "' . $extKey . '" AND reviewstate = 0 AND intversion > ' . $intVer . ' AND (SELECT intversion FROM cache_extensions WHERE extkey = "' . $extKey . '" AND reviewstate = -1 AND intversion = ' . $intVer . ') ORDER BY intversion LIMIT 1');
-			if ($row = sql_fetch_assoc($res)) {
-				return $row['version'];
-			}
-		}
-
-		return $curVersion;
-	}
+            }
+            break;
+        default :
+    }
+}
 
 
-	function getLatestVersion($extKey, $curVersion) {
-		if ($GLOBALS['version_4']) {
-			global $TYPO3_DB;
-			$intVer = convertVersionNumberToInteger($curVersion);
-			$res = sql_query('SELECT * FROM cache_extensions WHERE extkey = "' . $extKey . '" AND reviewstate = 0 AND intversion > ' . $intVer . ' AND (SELECT intversion FROM cache_extensions WHERE extkey = "' . $extKey . '" AND reviewstate = -1 AND intversion = ' . $intVer . ') ORDER BY intversion LIMIT 1');
-			if ($row = sql_fetch_assoc($res)) {
-				return $row['version'];
-			}
-		}
-		return $curVersion;
-	}
+function isInTer($extKey)
+{
+    if ($GLOBALS['version_4']) {
+        global $TYPO3_DB;
+        $intVer = convertVersionNumberToInteger($curVersion);
+        $res = sql_query('SELECT * FROM cache_extensions WHERE extkey = "' . $extKey . '"');
+        if ($row = sql_fetch_assoc($res)) {
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
 
-	/**
-	 * \TYPO3\CMS\Core\Utility\VersionNumberUtility::convertVersionNumberToInteger
-	 *
-	 * @param $versionNumber
-	 *
-	 * @return int
-	 */
-	function convertVersionNumberToInteger($versionNumber) {
-		$versionParts = explode(' . ', $versionNumber);
+function getSecureVersion($extKey, $curVersion)
+{
+    if ($GLOBALS['version_4']) {
+        global $TYPO3_DB;
+        $intVer = convertVersionNumberToInteger($curVersion);
+        $res = sql_query('SELECT * FROM cache_extensions WHERE extkey = "' . $extKey . '" AND reviewstate = 0 AND intversion > ' . $intVer . ' AND (SELECT intversion FROM cache_extensions WHERE extkey = "' . $extKey . '" AND reviewstate = -1 AND intversion = ' . $intVer . ') ORDER BY intversion LIMIT 1');
+        if ($row = sql_fetch_assoc($res)) {
+            return $row['version'];
+        }
+    }
 
-		return intval(((int)$versionParts[0] . str_pad((int)$versionParts[1], 3, '0', STR_PAD_LEFT)) . str_pad((int)$versionParts[2], 3, '0', STR_PAD_LEFT));
-	}
+    return $curVersion;
+}
 
 
-	function t3tool_ext_grep ($path, $string) {
+function getLatestVersion($extKey, $curVersion)
+{
+    if ($GLOBALS['version_4']) {
+        global $TYPO3_DB;
+        $intVer = convertVersionNumberToInteger($curVersion);
+        $res = sql_query('SELECT * FROM cache_extensions WHERE extkey = "' . $extKey . '" AND reviewstate = 0 AND intversion > ' . $intVer . ' AND (SELECT intversion FROM cache_extensions WHERE extkey = "' . $extKey . '" AND reviewstate = -1 AND intversion = ' . $intVer . ') ORDER BY intversion LIMIT 1');
+        if ($row = sql_fetch_assoc($res)) {
+            return $row['version'];
+        }
+    }
+    return $curVersion;
+}
 
-	}
+/**
+ * \TYPO3\CMS\Core\Utility\VersionNumberUtility::convertVersionNumberToInteger
+ *
+ * @param $versionNumber
+ *
+ * @return int
+ */
+function convertVersionNumberToInteger($versionNumber)
+{
+    $versionParts = explode(' . ', $versionNumber);
 
-	function t3tool_report_write_report_part($reportPath, $key, $title, $content, $classes='') {
-	    $key = md5($key);
-        $keyAbbr = substr($key, 0, 7);
+    return intval(((int)$versionParts[0] . str_pad((int)$versionParts[1], 3, '0', STR_PAD_LEFT)) . str_pad((int)$versionParts[2], 3, '0', STR_PAD_LEFT));
+}
 
-	    $html = "
+
+function t3tool_ext_grep($path, $string)
+{
+
+}
+
+function t3tool_report_write_report_part($reportPath, $key, $title, $content, $classes = '')
+{
+    $key = md5($key);
+    $keyAbbr = substr($key, 0, 7);
+
+    $html = "
             <div class='expandable key-$keyAbbr' data-key='$key' data-keyabbr='$keyAbbr' " . ($classes ? (' class="' . $classes . '"') : '') . ">
                 <div class='header'>$title</div>
                 <div class='content'></div>
             </div>";
 
-        file_put_contents(PATH_reports . $reportPath . '/data/' . $key . '.html', $content);
-        return $html;
-    }
+    file_put_contents(PATH_reports . $reportPath . '/data/' . $key . '.html', $content);
+    return $html;
+}
 
-	function t3tool_convert_linenumbers_to_hunks ($lineNumbers, array $codeLines){
+function t3tool_convert_linenumbers_to_hunks($lineNumbers, array $codeLines)
+{
 
-	    ksort($lineNumbers);
-        $lineNumbers = array_keys($lineNumbers);
+    ksort($lineNumbers);
+    $lineNumbers = array_keys($lineNumbers);
 
-	    $hunks = [];
-        $hunk = NULL;
-        $_lineNumber = 0;
-	    foreach ($lineNumbers as $lineNumber) {
-	        if ($lineNumber > $_lineNumber + 5) {
-	            if ($hunk) {
-	                $hunks[] = $hunk;
-                }
-                $hunk = array(
-                    'firstLine' => $lineNumber - 3,
-                );
+    $hunks = [];
+    $hunk = NULL;
+    $_lineNumber = 0;
+    foreach ($lineNumbers as $lineNumber) {
+        if ($lineNumber > $_lineNumber + 5) {
+            if ($hunk) {
+                $hunks[] = $hunk;
             }
-            $hunk['lastLine'] = $lineNumber + 3;
-            $hunk['lineCount'] = $hunk['lastLine'] - $hunk['firstLine'] + 1;
-	        $_lineNumber = $lineNumber;
+            $hunk = array(
+                'firstLine' => $lineNumber - 3,
+            );
         }
-	            $hunks[] = $hunk;
-
-        foreach ($hunks as &$hunk) {
-            $hunk['label'] = t3tool_code_get_hunk_label($codeLines, $hunk['firstLine']);
-            for ($l=$hunk['firstLine']; $l<$hunk['lastLine']+1; $l++) {
-                $hunk['code'][$l] = $codeLines[$l - 1];
-            }
-        }
-        return $hunks;
+        $hunk['lastLine'] = $lineNumber + 3;
+        $hunk['lineCount'] = $hunk['lastLine'] - $hunk['firstLine'] + 1;
+        $_lineNumber = $lineNumber;
     }
+    $hunks[] = $hunk;
 
-    function t3tool_code_get_string_role ($code, $string, $fileExtension = 'php') {
-        $code = trim($code);
+    foreach ($hunks as &$hunk) {
+        $hunk['label'] = t3tool_code_get_hunk_label($codeLines, $hunk['firstLine']);
+        for ($l = $hunk['firstLine']; $l < $hunk['lastLine'] + 1; $l++) {
+            $hunk['code'][$l] = $codeLines[$l - 1];
+        }
+    }
+    return $hunks;
+}
 
-        switch ($fileExtension) {
+function t3tool_code_get_string_role($code, $string, $fileExtension = 'php')
+{
+    $code = trim($code);
+
+    switch ($fileExtension) {
 
 
-            case 'php' :
+        case 'php' :
 
-                if (preg_match('/use .+' . $string . '/i', $code)) {
-                    return 'Use statement';
-                }
+            if (preg_match(';//.*' . $string . ';', $code)) {
+                return 'Comment';
+            }
+            if (preg_match(';/\*.*' . $string . '.*\*/;', $code)) {
+                return 'Comment';
+            }
+            if (preg_match(';/\* .*' . $string . ';', $code)) {
+                return 'Comment';
+            }
 
-                if (preg_match('/extends [^ ]*' . $string . '/i', $code)) {
-                    return 'Class inheritance statement';
-                }
-                if (preg_match('/implements [^ ]*' . $string . '/i', $code)) {
-                    return 'Interface implementation statement';
-                }
+            if (preg_match('/use .+' . $string . '/i', $code)) {
+                return 'Use statement';
+            }
 
-                if (preg_match('/\'[^\']*' . $string . '[^\']*\'/i', $code)
-                    ||
-                    preg_match('/"[^\"]*' . $string . '[^"]*"/i', $code)) {
-                    if (preg_match(';;', $code)) {
-                        return 'String literal';
-                    }
+            if (preg_match('/extends [^ ]*' . $string . '/i', $code)) {
+                return 'Class inheritance statement';
+            }
+            if (preg_match('/implements [^ ]*' . $string . '/i', $code)) {
+                return 'Interface implementation statement';
+            }
+
+            if (preg_match('/\'[^\']*' . $string . '[^\']*\'/i', $code)
+                ||
+                preg_match('/"[^\"]*' . $string . '[^"]*"/i', $code)) {
+                if (preg_match(';;', $code)) {
                     return 'String literal';
                 }
+                return 'String literal';
+            }
 
-                if (preg_match(';[a-z0-9_\\\\]*' . $string . '[a-z0-9_\\\\]*((->)|(::));i', $code)) {
-                    return 'Class name';
-                }
+            if (preg_match(';[a-z0-9_\\\\]*' . $string . '[a-z0-9_\\\\]*((->)|(::));i', $code)) {
+                return 'Class name';
+            }
 
-                break;
-            case 'html' :
+            break;
+        case 'html' :
 
-            case 'js' :
+        case 'js' :
 
-            case 'ts' :
-            case 'typoscript' :
+        case 'ts' :
+        case 'typoscript' :
 
-                return $fileExtension;
-                
-        }
-        return '?';
+            return $fileExtension;
+
     }
+    return '?';
+}
 
-    function t3tool_code_get_hunk_label (array $codeLines, $lineNum, $extension = 'php') {
-        $codeLine = $codeLines[$lineNum];
-        switch (strtolower($extension)) {
-            case 'js' :
-                for ($l = $lineNum; $l>0; $l--) {
-                    if (preg_match('/function/i', $codeLines[$l])) {
+function t3tool_code_get_hunk_label(array $codeLines, $lineNum, $extension = 'php')
+{
+    $codeLine = $codeLines[$lineNum];
+    switch (strtolower($extension)) {
+        case 'js' :
+            for ($l = $lineNum; $l > 0; $l--) {
+                if (preg_match('/function/i', $codeLines[$l])) {
+                    return $codeLines[$l];
+                }
+            }
+            break;
+
+        case 'php' :
+            if (preg_match('/\bfunction\b/i', $codeLine)) {
+                for ($l = $lineNum; $l > 0; $l--) {
+                    if (preg_match('/\bclass\b/i', $codeLines[$l])) {
                         return $codeLines[$l];
                     }
                 }
-                break;
-
-            case 'php' :
-                if (preg_match('/\bfunction\b/i', $codeLine)) {
-                    for ($l = $lineNum; $l>0; $l--) {
-                        if (preg_match('/\bclass\b/i', $codeLines[$l])) {
-                            return $codeLines[$l];
-                        }
-                    }
+            }
+            for ($l = $lineNum; $l > 0; $l--) {
+                if (preg_match('/\bfunction\b/i', $codeLines[$l])) {
+                    return $codeLines[$l];
                 }
-                for ($l = $lineNum; $l>0; $l--) {
-                    if (preg_match('/\bfunction\b/i', $codeLines[$l])) {
-                        return $codeLines[$l];
-                    }
-                }
-                break;
-        }
-
-        return '';
+            }
+            break;
     }
 
-	function t3tool_ext_cmdaliases() {
-		return array(
-			'dis' => 'ext disable',
-			'en' => 'ext enable',
-			'pmi' => 'ext show',
-			'pml' => 'ext available',
-		);
-	}
+    return '';
+}
 
-	function t3tool_ext_usage_short() {
-		return ('Extension commands:
+function t3tool_ext_cmdaliases()
+{
+    return array(
+        'dis' => 'ext disable',
+        'en' => 'ext enable',
+        'pmi' => 'ext show',
+        'pml' => 'ext available',
+    );
+}
+
+function t3tool_ext_usage_short()
+{
+    return ('Extension commands:
   t3tool ext list
     List installed extensions
   t3tool ext show
@@ -1344,11 +1253,12 @@ nodesep=0.6;
     Show dependency information for all extensions
 ');
 
-	}
+}
 
-	function t3tool_ext_usage_long() {
+function t3tool_ext_usage_long()
+{
 
-		return ('Extension commands:
+    return ('Extension commands:
   t3tool ext list <part of extension key>
     List installed extensions
   t3tool ext key-list <part of extension key>
@@ -1384,60 +1294,63 @@ Special options for commands dependencies and mentions
 
 ');
 
-	}
+}
 
-	/**
-	 * @return array
-	 */
-	function t3tool_ext_completion() {
-		return array(
-			"ext" => array(
-				'analyze' => 't3tool_ext_completion_exts',
-				'dependencies' => 1,
-				'health-check' => 1,
-				'install' => 't3tool_ext_completion_exts',
-				'list' => 1,
-				'key-list' => 1,
-				'mentions' => 't3tool_ext_completion_exts,t3tool_ext_completion_exts',
-				'show' => 't3tool_ext_completion_exts',
-				'uninstall' => 't3tool_ext_completion_exts',
+/**
+ * @return array
+ */
+function t3tool_ext_completion()
+{
+    return array(
+        "ext" => array(
+            'analyze' => 't3tool_ext_completion_exts',
+            'dependencies' => 1,
+            'health-check' => 1,
+            'install' => 't3tool_ext_completion_exts',
+            'list' => 1,
+            'key-list' => 1,
+            'mentions' => 't3tool_ext_completion_exts,t3tool_ext_completion_exts',
+            'show' => 't3tool_ext_completion_exts',
+            'uninstall' => 't3tool_ext_completion_exts',
 
-			),
+        ),
 
-		);
+    );
 
-	}
+}
 
-	function t3tool_ext_completion_exts() {
+function t3tool_ext_completion_exts()
+{
 
-		if ($GLOBALS['version_4']) {
-			$exts = explode(',', $GLOBALS['TYPO3_CONF_VARS']['EXT']['extList']);
-		}
-		if ($GLOBALS['version_6']) {
-			$exts = $GLOBALS['TYPO3_CONF_VARS']['EXT']['extListArray'];
-		}
-		if (file_exists(PATH_typo3conf . 'PackageStates.php')) {
-			$exts = array();
-			$packageStates = include(PATH_typo3conf . 'PackageStates.php');
-			$exts = array_keys($packageStates['packages']);
+    if ($GLOBALS['version_4']) {
+        $exts = explode(',', $GLOBALS['TYPO3_CONF_VARS']['EXT']['extList']);
+    }
+    if ($GLOBALS['version_6']) {
+        $exts = $GLOBALS['TYPO3_CONF_VARS']['EXT']['extListArray'];
+    }
+    if (file_exists(PATH_typo3conf . 'PackageStates.php')) {
+        $exts = array();
+        $packageStates = include(PATH_typo3conf . 'PackageStates.php');
+        $exts = array_keys($packageStates['packages']);
 
-		}
+    }
 
-		return $exts;
-	}
+    return $exts;
+}
 
-	/**
-	 * @return array
-	 */
-	function t3tool_ext_completion_options () {
-		return array(
-			'dot',
-			'exclude',
-			'git',
-			'include',
-			'include-files',
-			'output',
-			'system',
-			'ter'
-		);
-	}
+/**
+ * @return array
+ */
+function t3tool_ext_completion_options()
+{
+    return array(
+        'dot',
+        'exclude',
+        'git',
+        'include',
+        'include-files',
+        'output',
+        'system',
+        'ter'
+    );
+}
