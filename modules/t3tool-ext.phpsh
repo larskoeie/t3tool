@@ -363,6 +363,8 @@ function t3tool_ext_handlecmd($args)
             $to = trim(strtolower($args[1]));
             $to = $to ? explode(',', $to) : NULL;
 
+            $excludeDependers = getOption('exclude-dependers') ? explode(',', getOption('exclude-dependers')) : [];
+            $excludeDependees = getOption('exclude-dependees') ? explode(',', getOption('exclude-dependees')) : [];
 
             output_cmd('Determining git statuses for all extensions');
             foreach ($EM_CONF as $extkey => &$config) {
@@ -414,7 +416,8 @@ function t3tool_ext_handlecmd($args)
             foreach ($EM_CONF as $_EXTKEY => $config) {
                 if ($EM_CONF[$_EXTKEY]['added by t3tool']['installed'] &&
                     $EM_CONF[$_EXTKEY]['added by t3tool']['type'] == 'Local' &&
-                    !in_array($_EXTKEY, $exclude)
+                    !in_array($_EXTKEY, $exclude) &&
+                    !in_array($_EXTKEY, $excludeDependees)
                 ) {
                     $prefixes[$_EXTKEY][] = $_EXTKEY;
                     $prefixes[$_EXTKEY][] = str_replace('_', '', $_EXTKEY);
@@ -427,7 +430,8 @@ function t3tool_ext_handlecmd($args)
             foreach ($EM_CONF as $_EXTKEY => $config) {
                 if ($EM_CONF[$_EXTKEY]['added by t3tool']['installed'] &&
                     $EM_CONF[$_EXTKEY]['added by t3tool']['type'] == 'Local' &&
-                    !in_array($_EXTKEY, $exclude)
+                    !in_array($_EXTKEY, $exclude) &&
+                    !in_array($_EXTKEY, $excludeDependers)
 
                 ) {
 
@@ -470,10 +474,15 @@ function t3tool_ext_handlecmd($args)
                                  * - composer.json, same reason
                                  * - .git/ as it contains old, possibly removed, code
                                  *
+                                 * - r : recursive
+                                 * - n
+                                 * - i : case insensitive
+                                 * - I : skip binary files
+                                 *
                                  * If file extensions to include is specified, use them.
                                  *
                                  */
-                                $command .= 'grep -rni --exclude="composer.json" --exclude="ext_emconf.php" --exclude-dir=".git"';
+                                $command .= 'grep -rniI --exclude="composer.json" --exclude="ext_emconf.php" --exclude-dir=".git"';
                                 if (getOption('include-files')) {
                                     $command .= ' --include="' . getOption('include-files') . '"';
                                 }
@@ -575,7 +584,12 @@ function t3tool_ext_handlecmd($args)
 
             }
 
+            output_cmd('Writing data to ' . PATH_t3tool . 'mentions.json');
             file_put_contents(PATH_t3tool . 'mentions.json', json_encode($mentionsStruct, JSON_PRETTY_PRINT));
+            if ($error = json_last_error_msg()) {
+                echo $error;
+            }
+            output_ok();
 
             break;
 
@@ -1154,7 +1168,7 @@ function t3tool_convert_linenumbers_to_hunks($lineNumbers, array $codeLines)
     foreach ($hunks as &$hunk) {
         $hunk['label'] = t3tool_code_get_hunk_label($codeLines, $hunk['firstLine']);
         for ($l = $hunk['firstLine']; $l < $hunk['lastLine'] + 1; $l++) {
-            $hunk['code'][$l] = $codeLines[$l - 1];
+            $hunk['code'][$l] = crop($codeLines[$l - 1], 200);
         }
     }
     return $hunks;
@@ -1267,6 +1281,10 @@ function t3tool_ext_usage_short()
     Show info of extension
   t3tool ext dependencies
     Show dependency information for all extensions
+  t3tool ext mentions
+    Build structured mention information
+  t3tool ext mentions-report
+    Build mentions report from structured info built with "ext mentions"
 ');
 
 }
@@ -1301,8 +1319,11 @@ Options :
       Include extensions that would otherwise not be handled.
     --exclude=<list of extension keys>
       Exclude specific extensions. Overrides all of the above.
-
 Special options for commands dependencies and mentions
+    --exclude-dependers=<list of extension keys>
+      Exclude specific extensions as depender.
+    --exclude-dependees=<list of extension keys>
+      Exclude specific extensions as dependee
     --to-inactive
 
     --to-system
