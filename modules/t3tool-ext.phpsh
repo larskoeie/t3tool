@@ -111,8 +111,8 @@ function t3tool_ext_handlecmd($args)
 
 
     // build list of extensions to handle
-    $include = explode(',', getOption('include'));
-    $exclude = explode(',', getOption('exclude'));
+    $include = getOption('include') ? explode(',', getOption('include')) : [];
+    $exclude = getOption('exclude') ? explode(',', getOption('exclude')) : [];
     $showOnlyExts = array();
     foreach ($EM_CONF as $_EXTKEY => $config) {
         $handle =
@@ -358,11 +358,12 @@ function t3tool_ext_handlecmd($args)
 
             $extkeys = array();
 
-            $from = trim(strtolower($args[0]));
-            $from = $from ? explode(',', $from) : NULL;
-            $to = trim(strtolower($args[1]));
-            $to = $to ? explode(',', $to) : NULL;
+            if (sizeof($args)) {
+                return 'Arguments are not allowed';
+            }
 
+            $includeDependers = getOption('include-dependers') ? explode(',', getOption('include-dependers')) : [];
+            $includeDependees = getOption('include-dependees') ? explode(',', getOption('include-dependees')) : [];
             $excludeDependers = getOption('exclude-dependers') ? explode(',', getOption('exclude-dependers')) : [];
             $excludeDependees = getOption('exclude-dependees') ? explode(',', getOption('exclude-dependees')) : [];
 
@@ -410,14 +411,21 @@ function t3tool_ext_handlecmd($args)
                 'grepDatetime' => date(DATE_W3C, time()),
                 'hostName' => file_get_contents('/etc/hostname'),
                 'siteRootPath' => getcwd(),
+                'include' => implode(',', $include),
+                'exclude' => implode(',', $exclude),
+                'includeDependers' => implode(',', $includeDependers),
+                'includeDependees' => implode(',', $includeDependees),
+                'excludeDependers' => implode(',', $excludeDependers),
+                'excludeDependees' => implode(',', $excludeDependees),
             ];
 
             // make list of strings to search for
             foreach ($EM_CONF as $_EXTKEY => $config) {
                 if ($EM_CONF[$_EXTKEY]['added by t3tool']['installed'] &&
                     $EM_CONF[$_EXTKEY]['added by t3tool']['type'] == 'Local' &&
-                    !in_array($_EXTKEY, $exclude) &&
-                    !in_array($_EXTKEY, $excludeDependees)
+                    (!sizeof($include) || in_array_wildcard($_EXTKEY, $include)) &&
+                    !in_array_wildcard($_EXTKEY, $exclude) &&
+                    !in_array_wildcard($_EXTKEY, $excludeDependees)
                 ) {
                     $prefixes[$_EXTKEY][] = $_EXTKEY;
                     $prefixes[$_EXTKEY][] = str_replace('_', '', $_EXTKEY);
@@ -425,11 +433,15 @@ function t3tool_ext_handlecmd($args)
                 }
 
             }
+            print_r($mentionsStruct);
 
             // do search
+
             foreach ($EM_CONF as $_EXTKEY => $config) {
+
                 if ($EM_CONF[$_EXTKEY]['added by t3tool']['installed'] &&
                     $EM_CONF[$_EXTKEY]['added by t3tool']['type'] == 'Local' &&
+                    (!sizeof($include) || in_array_wildcard($_EXTKEY, $include)) &&
                     !in_array($_EXTKEY, $exclude) &&
                     !in_array($_EXTKEY, $excludeDependers)
 
@@ -442,13 +454,13 @@ function t3tool_ext_handlecmd($args)
                             continue;
                         }
                         // if arg-0 is set and neither is in arg-0, do not search
-                        if ($from) {
-                            if ($to) {
-                                if (!in_array_wildcard($_EXTKEY, $from) || !in_array_wildcard($dependee, $to)) {
+                        if (sizeof($includeDependers)) {
+                            if (sizeof($includeDependees)) {
+                                if (!in_array_wildcard($_EXTKEY, $includeDependers) || !in_array_wildcard($dependee, $includeDependees)) {
                                     continue;
                                 }
                             } else {
-                                if (!in_array_wildcard($_EXTKEY, $from) && !in_array_wildcard($dependee, $from)) {
+                                if (!in_array_wildcard($_EXTKEY, $includeDependers) && !in_array_wildcard($dependee, $includeDependees)) {
                                     continue;
                                 }
                             }
@@ -500,11 +512,7 @@ function t3tool_ext_handlecmd($args)
                                     foreach ($output as $file) {
 
                                         $mentionsStruct['extensions'][$_EXTKEY]['git'] = $EM_CONF[$_EXTKEY]['added by t3tool']['git'];
-                                        $header_ext = "\n$_EXTKEY -> $dependee :";
 
-                                        if ($header_ext != $_header_ext) {
-                                            $_header_ext = $header_ext;
-                                        }
                                         if (preg_match(';^\./(.+\.([a-z0-9]{1,4})):([0-9]+):(.+)$;', $file, $m)) {
                                             $filepath = $m[1];
                                             $fileextension = $m[2];
@@ -557,13 +565,16 @@ function t3tool_ext_handlecmd($args)
                                         /**
                                          * Git blame
                                          */
-                                        $firstLine = $hunk['firstLine'];
-                                        $lastLine = $hunk['lastLine'];
-                                        $command = "cd " . PATH_site . $path . "; if [ -d .git ]; then git blame -L $firstLine,$lastLine $filepath; fi";
-                                        $output = array();
-                                        exec($command, $output);
-                                        if (sizeof($output)) {
-                                            $hunk['git-blame'] = $output;
+                                        if (0) {
+
+                                            $firstLine = $hunk['firstLine'];
+                                            $lastLine = $hunk['lastLine'];
+                                            $command = "cd " . PATH_site . $path . "; if [ -d .git ]; then git blame -L $firstLine,$lastLine $filepath; fi";
+                                            $output = array();
+                                            exec($command, $output);
+                                            if (sizeof($output)) {
+                                                $hunk['git-blame'] = $output;
+                                            }
                                         }
                                         $mentionsStruct['extensions'][$_EXTKEY]['mentionees'][$dependee]['mentions'][$file][] = $hunk;
 
@@ -615,7 +626,6 @@ function t3tool_ext_handlecmd($args)
             output_cmd('Building report');
 
             foreach ($mentions['extensions'] as $dependerKey => $depender) {
-
 
 
                 $dependerDot = "$dependerKey [shape=box]\n";
@@ -813,10 +823,16 @@ nodesep=0.6;" . $fullDot . "\n}";
 
             $indexHtml .= t3tool_report_write_report_part($reportPath, 'report-info', 'Report info', '
             <ul>
-            <li>Grep time : ' . $mentions['grepDatetime'] . '</li>
-            <li>Report build time : ' . date(DATE_W3C, time()) . '</li>
-            <li>Host name : ' . $mentions['hostName']  . '</li>
-            <li>TYPO3 root path : ' . $mentions['siteRootPath']  . '</li>
+                <li>Grep time : ' . $mentions['grepDatetime'] . '</li>
+                <li>Report build time : ' . date(DATE_W3C, time()) . '</li>
+                <li>Host name : ' . $mentions['hostName'] . '</li>
+                <li>TYPO3 root path : ' . $mentions['siteRootPath'] . '</li>
+                <li>Include : ' . $mentions['include'] . '</li>
+                <li>Exclude : ' . $mentions['exclude'] . '</li>
+                <li>Include as dependers : ' . $mentions['includeDependers'] . '</li>
+                <li>Include as dependees : ' . $mentions['includeDependees'] . '</li>
+                <li>Exclude as dependers : ' . $mentions['excludeDependers'] . '</li>
+                <li>Exclude as dependees : ' . $mentions['excludeDependees'] . '</li>
             </ul>
             ');
             $indexHtml .= t3tool_report_write_report_part($reportPath, 'by-depender', 'Extensions by depender', $byDependerHtml);
