@@ -353,11 +353,19 @@
     echo "Connecting to database... ";
 
     $db = $TYPO3_CONF_VARS['DB'];
-    $typo_db_host = $db['host'];
-    $typo_db_username = $db['username'];
-    $typo_db_password = $db['password'];
-    $typo_db = $db['database'];
 
+    if (isset($db['Connections']['Default'])) {
+        $db = $db['Connections']['Default'];
+        $typo_db_host = $db['host'];
+        $typo_db_username = $db['user'];
+        $typo_db_password = $db['password'];
+        $typo_db = $db['dbname'];
+    } else {
+        $typo_db_host = $db['host'];
+        $typo_db_username = $db['username'];
+        $typo_db_password = $db['password'];
+        $typo_db = $db['database'];
+    }
     if (!$typo_db) {
       die("Error: Can't connect to DB. Halting.\n\n");
     }
